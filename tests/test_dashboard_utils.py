@@ -8,6 +8,7 @@ from dashboard_utils import (
     format_100m_usd,
     industry_period_summary,
     sidebar_guide_sections,
+    growth_calculation_guide,
 )
 
 
@@ -74,3 +75,15 @@ def test_sidebar_guide_explains_navigation_mapping_and_updates():
     assert "HS10 → 리서치 중분류 → 대표품목 → 산업부 Top20" in sections["분류·매핑 확인"]
     assert "데이터 점검" in sections["분류·매핑 확인"]
     assert "Commit to main → Push origin" in sections["데이터 갱신·웹 반영"]
+
+
+def test_growth_calculation_guide_explains_amounts_modes_and_units():
+    guide = growth_calculation_guide()
+
+    assert "HS10별 월 수출액의 합" in guide
+    assert "첫 3개월 월평균" in guide
+    assert "마지막 3개월 월평균" in guide
+    assert "현재 선택기간 합계" in guide
+    assert "직전 동일 길이 기간 합계" in guide
+    assert "100,000,000" in guide
+    assert "미매핑 HS10" in guide
