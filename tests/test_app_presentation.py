@@ -27,6 +27,12 @@ def test_growth_mode_defaults_to_previous_equal_period_and_explains_comparison()
     assert "현재 비교:" in TEXT
 
 
+def test_quick_range_always_controls_dates_until_direct_mode_is_selected():
+    assert 'if quick != "직접":' in TEXT
+    assert 'st.session_state.get("_quick_last")' not in TEXT
+    assert 'st.session_state["_quick_last"]' not in TEXT
+
+
 def test_navigation_and_flash_page_use_korean_labels_and_canonical_schema():
     for label in ["종합 현황", "산업 스크리너", "산업 상세", "수출 성장", "품목 모니터", "종목 후보", "최근 수출", "데이터 점검"]:
         assert label in TEXT
