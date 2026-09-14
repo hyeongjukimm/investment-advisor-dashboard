@@ -10,8 +10,8 @@ from dashboard_utils import (
     sidebar_guide_sections,
     growth_calculation_guide,
     parse_date_text,
-    available_growth_windows,
-    growth_comparison_range,
+    available_growth_years,
+    growth_year_comparison_range,
 )
 
 
@@ -36,15 +36,20 @@ def test_parse_date_text_rejects_invalid_calendar_date():
         raise AssertionError("invalid date must raise ValueError")
 
 
-def test_available_growth_windows_require_two_complete_windows():
-    assert available_growth_windows("2025-01-01", "2026-08-01") == [3, 6]
-    assert available_growth_windows("2020-01-01", "2026-08-01") == [3, 6, 12, 24]
+def test_available_growth_years_require_the_prior_year():
+    assert available_growth_years("2023-01-01", "2026-08-01") == [2026, 2025, 2024]
 
 
-def test_growth_comparison_range_builds_current_and_previous_windows():
-    current_start, current_end, previous_start, previous_end = growth_comparison_range("2026-08-01", 12)
-    assert (current_start, current_end) == (pd.Timestamp("2025-09-01"), pd.Timestamp("2026-08-01"))
-    assert (previous_start, previous_end) == (pd.Timestamp("2024-09-01"), pd.Timestamp("2025-08-01"))
+def test_growth_year_comparison_range_uses_ytd_for_latest_year():
+    current_start, current_end, previous_start, previous_end = growth_year_comparison_range(2026, "2026-08-01")
+    assert (current_start, current_end) == (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-08-01"))
+    assert (previous_start, previous_end) == (pd.Timestamp("2025-01-01"), pd.Timestamp("2025-08-01"))
+
+
+def test_growth_year_comparison_range_uses_full_completed_year():
+    current_start, current_end, previous_start, previous_end = growth_year_comparison_range(2025, "2026-08-01")
+    assert (current_start, current_end) == (pd.Timestamp("2025-01-01"), pd.Timestamp("2025-12-01"))
+    assert (previous_start, previous_end) == (pd.Timestamp("2024-01-01"), pd.Timestamp("2024-12-01"))
 
 
 def test_quick_month_range_three_years_is_36_months_inclusive():
@@ -110,8 +115,8 @@ def test_growth_calculation_guide_explains_amounts_modes_and_units():
     guide = growth_calculation_guide()
 
     assert "HS10별 월 수출액의 합" in guide
-    assert "최근 3·6·12·24개월" in guide
-    assert "직전 동일 길이 기간" in guide
-    assert "상단 시작일" in guide
+    assert "완료된 연도" in guide
+    assert "진행 중인 연도" in guide
+    assert "전년 같은 월까지" in guide
     assert "100,000,000" in guide
     assert "미매핑 HS10" in guide
