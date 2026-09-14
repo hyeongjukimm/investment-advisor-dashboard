@@ -1,4 +1,5 @@
 import pandas as pd
+import inspect
 
 import customs_pipeline as cp
 
@@ -53,3 +54,23 @@ def test_history_backfill_range_resumes_missing_older_segment():
     assert cp._history_backfill_range(None, floor, target) == (floor, target)
     assert cp._history_backfill_range(pd.Timestamp("2024-01-01"), floor, target) == (floor, pd.Timestamp("2023-12-01"))
     assert cp._history_backfill_range(pd.Timestamp("2020-01-01"), floor, target) is None
+
+
+def test_missing_month_ranges_finds_internal_customs_history_gap(tmp_path):
+    db = tmp_path / "gapped.sqlite"
+    cp.init_sqlite_db(db)
+    rows = pd.DataFrame([
+        {"date": pd.Timestamp("2020-01-01"), "hsk10": "0000000001", "hsk_name": "A", "export_usd": 1},
+        {"date": pd.Timestamp("2020-02-01"), "hsk10": "0000000001", "hsk_name": "A", "export_usd": 1},
+        {"date": pd.Timestamp("2020-06-01"), "hsk10": "0000000001", "hsk_name": "A", "export_usd": 1},
+    ])
+    cp.upsert_dataframe(db, "raw_item", rows, ["date", "hsk10"])
+
+    assert cp._missing_month_ranges(db, "raw_item", "2020-01-01", "2020-06-01") == [
+        (pd.Timestamp("2020-03-01"), pd.Timestamp("2020-05-01"))
+    ]
+
+
+def test_refresh_checks_internal_month_gaps_not_only_minimum_date():
+    source = inspect.getsource(cp.refresh_customs_data)
+    assert "_missing_month_ranges" in source
