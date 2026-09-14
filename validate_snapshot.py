@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sqlite3
+from datetime import date
 from pathlib import Path
 
 REQUIRED_TABLES = {"mart_export_top20_monthly", "dim_product_taxonomy", "mart_metadata"}
@@ -29,6 +30,19 @@ def validate_snapshot(path: str | Path) -> dict:
             rows = int(con.execute("SELECT COUNT(*) FROM mart_export_top20_monthly").fetchone()[0])
             if rows <= 0:
                 raise SnapshotValidationError("Top20 월별 데이터가 비어 있습니다.")
+            observed = [date.fromisoformat(row[0][:10]) for row in con.execute(
+                "SELECT DISTINCT date FROM mart_export_top20_monthly ORDER BY date"
+            )]
+            expected = observed[0]
+            missing_months = []
+            observed_set = set(observed)
+            while expected <= observed[-1]:
+                if expected not in observed_set:
+                    missing_months.append(expected.strftime("%Y-%m"))
+                expected = date(expected.year + (expected.month == 12), expected.month % 12 + 1, 1)
+            if missing_months:
+                preview = ", ".join(missing_months[:6])
+                raise SnapshotValidationError(f"Top20 월 누락: {preview}")
             metadata = dict(con.execute("SELECT key,value FROM mart_metadata").fetchall())
     except sqlite3.Error as exc:
         raise SnapshotValidationError(f"SQLite 읽기 실패: {exc}") from exc
