@@ -12,7 +12,7 @@ import streamlit as st
 import urllib3
 
 from customs_pipeline import CustomsClient, refresh_customs_data
-from dashboard_utils import available_growth_windows, growth_comparison_range, normalize_month_range, parse_date_text, quick_month_range, format_100m_usd, industry_period_summary, sidebar_guide_sections
+from dashboard_utils import available_growth_years, growth_year_comparison_range, normalize_month_range, parse_date_text, quick_month_range, format_100m_usd, industry_period_summary, sidebar_guide_sections
 from data_lineage import page_methodology, source_caption
 from deployment_mode import allow_admin_controls, is_shared_mode
 from export_analytics import growth_leaders
@@ -331,28 +331,30 @@ PAGES = ["종합 현황", "산업 스크리너", "산업 상세", "수출 성장
 page = st.radio("페이지", PAGES, horizontal=True, label_visibility="collapsed", key="page")
 
 available_start, available_end = mart_bounds()
+period_start, period_end = quick_month_range(available_end, "5Y", available_start)
 if "period_start_input" not in st.session_state or "period_end_input" not in st.session_state:
     a, b = quick_month_range(available_end, "5Y", available_start)
     st.session_state.period_start_input = f"{a:%Y-%m-%d}"; st.session_state.period_end_input = f"{b:%Y-%m-%d}"
 
-with st.container(border=True):
-    r1, r2, r3, r4 = st.columns([1.0, 1.2, 1.2, 1.1])
-    quick = r1.selectbox("빠른 기간", ["직접", "1Y", "3Y", "5Y", "10Y", "전체"], key="quick_range")
-    if quick != "직접":
-        a, b = quick_month_range(available_end, quick, available_start)
-        st.session_state.period_start_input = f"{a:%Y-%m-%d}"; st.session_state.period_end_input = f"{b:%Y-%m-%d}"
-    start_text = r2.text_input("기간 시작", key="period_start_input", help="260901, 20260901, 2026-09-01 형식 지원")
-    end_text = r3.text_input("기간 종료", key="period_end_input", help="260901, 20260901, 2026-09-01 형식 지원")
-    try:
-        start_date, end_date = parse_date_text(start_text), parse_date_text(end_text)
-        if start_date < available_start or end_date > available_end:
-            raise ValueError(f"조회 가능 기간은 {available_start:%Y-%m-%d}~{available_end:%Y-%m-%d}입니다.")
-        period_start, period_end = normalize_month_range(start_date, end_date)
-        st.session_state["_last_valid_period"] = (period_start, period_end)
-    except ValueError as exc:
-        st.error(str(exc))
-        period_start, period_end = st.session_state.get("_last_valid_period", (available_start, available_end))
-    r4.metric("표시 기간", f"{period_start:%Y.%m}–{period_end:%Y.%m}")
+if page != "수출 성장":
+    with st.container(border=True):
+        r1, r2, r3, r4 = st.columns([1.0, 1.2, 1.2, 1.1])
+        quick = r1.selectbox("빠른 기간", ["직접", "1Y", "3Y", "5Y", "10Y", "전체"], key="quick_range")
+        if quick != "직접":
+            a, b = quick_month_range(available_end, quick, available_start)
+            st.session_state.period_start_input = f"{a:%Y-%m-%d}"; st.session_state.period_end_input = f"{b:%Y-%m-%d}"
+        start_text = r2.text_input("기간 시작", key="period_start_input", help="260901, 20260901, 2026-09-01 형식 지원")
+        end_text = r3.text_input("기간 종료", key="period_end_input", help="260901, 20260901, 2026-09-01 형식 지원")
+        try:
+            start_date, end_date = parse_date_text(start_text), parse_date_text(end_text)
+            if start_date < available_start or end_date > available_end:
+                raise ValueError(f"조회 가능 기간은 {available_start:%Y-%m-%d}~{available_end:%Y-%m-%d}입니다.")
+            period_start, period_end = normalize_month_range(start_date, end_date)
+            st.session_state["_last_valid_period"] = (period_start, period_end)
+        except ValueError as exc:
+            st.error(str(exc))
+            period_start, period_end = st.session_state.get("_last_valid_period", (available_start, available_end))
+        r4.metric("표시 기간", f"{period_start:%Y.%m}–{period_end:%Y.%m}")
 
 with st.expander("ⓘ 데이터·산출 기준", expanded=False):
     st.markdown(page_methodology(page))
@@ -506,23 +508,22 @@ def render_industry_detail():
             render_chart(fig_layout(fig,430,"YoY (%)",False),source_key="customs_item",csv_df=p,csv_name=f"{item}_products",key="det4")
 
 
-def _leaders_source(level: str, top20: str | None, middle: str | None) -> tuple[pd.DataFrame,str,str]:
+def _leaders_source(level: str, top20: str | None, middle: str | None, comparison_end: pd.Timestamp) -> tuple[pd.DataFrame,str,str]:
     if level=="Top20":
-        return month_sql("mart_export_top20_monthly",available_start,period_end),"item20","Top20"
+        return month_sql("mart_export_top20_monthly",available_start,comparison_end),"item20","Top20"
     if level=="리서치중분류":
-        return month_sql("mart_export_middle_monthly",available_start,period_end,"AND item20=?",(top20,)),"middle_category","리서치중분류"
-    return month_sql("mart_export_product_monthly",available_start,period_end,"AND item20=? AND middle_category=?",(top20,middle)),"product","대표품목"
+        return month_sql("mart_export_middle_monthly",available_start,comparison_end,"AND item20=?",(top20,)),"middle_category","리서치중분류"
+    return month_sql("mart_export_product_monthly",available_start,comparison_end,"AND item20=? AND middle_category=?",(top20,middle)),"product","대표품목"
 
 
 def render_growth_leaders():
     st.session_state.setdefault("gl_top20",None); st.session_state.setdefault("gl_middle",None)
     mode_col,base_col=st.columns([1.7,1])
-    windows = available_growth_windows(available_start, period_end)
-    if not windows:
-        st.warning("현재 데이터로는 최근 기간과 직전 동일기간을 비교할 수 없습니다.")
+    years = available_growth_years(available_start, available_end)
+    if not years:
+        st.warning("전년과 비교할 수 있는 연도 데이터가 없습니다.")
         return
-    default_window = 12 if 12 in windows else max(windows)
-    window_months=mode_col.selectbox("성장 비교기간",windows,index=windows.index(default_window),format_func=lambda n:f"최근 {n}개월 합계 vs 직전 {n}개월 합계")
+    selected_year=mode_col.selectbox("기준 연도",years,index=0,format_func=lambda y:f"{y}년")
     min_base=base_col.number_input("최소 비교규모 (억달러)",min_value=0.0,value=1.0,step=1.0)
     top20=st.session_state.gl_top20; middle=st.session_state.gl_middle
     if not top20: level="Top20"
@@ -535,9 +536,10 @@ def render_growth_leaders():
         st.session_state.gl_middle=None; st.rerun()
     crumb="Top20"+(f" → {top20}" if top20 else "")+(f" → {middle}" if middle else "")
     b3.markdown(f"**Top20 → 리서치중분류 → 대표품목** &nbsp; | &nbsp; 현재: {crumb}")
-    source,entity,label=_leaders_source(level,top20,middle)
-    comparison_start, comparison_end, previous_start, previous_end = growth_comparison_range(period_end, window_months)
-    st.caption(f"현재 비교: 최근 {window_months}개월 합계({comparison_start:%Y.%m}–{comparison_end:%Y.%m}) vs 직전 {window_months}개월 합계({previous_start:%Y.%m}–{previous_end:%Y.%m}) · 상단 시작일은 이 순위 계산에 사용하지 않습니다.")
+    comparison_start, comparison_end, previous_start, previous_end = growth_year_comparison_range(selected_year, available_end)
+    source,entity,label=_leaders_source(level,top20,middle,comparison_end)
+    comparison_label = "누계" if comparison_end.month < 12 else "연간"
+    st.caption(f"현재 비교: {selected_year}년 {comparison_label}({comparison_start:%Y.%m}–{comparison_end:%Y.%m}) vs {selected_year-1}년 같은 기간({previous_start:%Y.%m}–{previous_end:%Y.%m})")
     leaders=growth_leaders(source,entity,comparison_start,comparison_end,min_base_usd=min_base*1e8,mode="previous_period")
     if leaders.empty: st.warning("조건을 만족하는 항목이 없습니다."); return
     show=leaders.copy(); show["기간수출_억달러"]=show["period_export_usd"]/1e8; show["증가액_억달러"]=show["absolute_increase_usd"]/1e8
