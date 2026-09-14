@@ -630,6 +630,31 @@ def _history_backfill_range(min_date: pd.Timestamp | None, history_floor: pd.Tim
     return floor, current_min - pd.DateOffset(months=1)
 
 
+def _missing_month_ranges(db_path: str | Path, table: str, start, end) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
+    """Return contiguous missing calendar-month ranges in a monthly raw table."""
+    start = pd.Timestamp(start).to_period("M").to_timestamp()
+    end = pd.Timestamp(end).to_period("M").to_timestamp()
+    expected = pd.date_range(start, end, freq="MS")
+    with sqlite3.connect(db_path) as con:
+        rows = con.execute(
+            f'SELECT DISTINCT date FROM "{table}" WHERE date>=? AND date<=? ORDER BY date',
+            (start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")),
+        ).fetchall()
+    present = {pd.Timestamp(row[0]).to_period("M").to_timestamp() for row in rows}
+    missing = [month for month in expected if month not in present]
+    if not missing:
+        return []
+    ranges = []
+    range_start = previous = missing[0]
+    for month in missing[1:]:
+        if month != previous + pd.DateOffset(months=1):
+            ranges.append((range_start, previous))
+            range_start = month
+        previous = month
+    ranges.append((range_start, previous))
+    return ranges
+
+
 def _refresh_start(max_date: pd.Timestamp | None, target: pd.Timestamp, bootstrap_months: int, force: bool) -> pd.Timestamp:
     target = pd.Timestamp(target.year, target.month, 1)
     if force or max_date is None or pd.isna(max_date):
@@ -730,14 +755,12 @@ def refresh_customs_data(
     if auto_probe:
         upsert_dataframe(db_path, "raw_item", probe_df, ["date", "hsk10"])
         collected = len(probe_df)
-        # Backfill a configured history floor. If a first build was interrupted,
-        # resume only the missing older segment instead of assuming MAX(date) means complete history.
-        hist_range = _history_backfill_range(previous_item_min, history_floor, target_month)
-        if hist_range is None and (previous_item_max is None or pd.isna(previous_item_max)):
-            hist_range = (target_month - pd.DateOffset(months=bootstrap_months - 1), target_month)
-        if hist_range is not None:
-            start, hist_end = hist_range
-            for a, b in iter_month_chunks(start, hist_end, 12):
+        # Backfill every missing calendar segment. MIN/MAX alone cannot detect an
+        # interrupted middle section (for example 2011 followed by 2024).
+        backfill_start = history_floor or (target_month - pd.DateOffset(months=bootstrap_months - 1))
+        missing_ranges = _missing_month_ranges(db_path, "raw_item", backfill_start, target_month)
+        for missing_start, missing_end in missing_ranges:
+            for a, b in iter_month_chunks(missing_start, missing_end, 12):
                 df = normalize_itemtrade(client.fetch("item", a, b))
                 upsert_dataframe(db_path, "raw_item", df, ["date", "hsk10"])
                 collected += len(df)
@@ -755,6 +778,7 @@ def refresh_customs_data(
             "received": collected,
             "max_date": str(current_max.date()) if current_max is not None else None,
             "probe_received": len(probe_df),
+            "backfilled_ranges": len(missing_ranges),
         }
     elif not force and _already_fresh_today(db_path, "item", target_month):
         result["skipped"].append("item")
@@ -827,4 +851,3 @@ def refresh_customs_data(
         result["datasets"][dataset_key] = {"received": collected, "max_date": str(current_max.date()) if current_max is not None else None}
 
     return result
-
