@@ -20,11 +20,11 @@ def test_v4_has_calendar_controls_and_quick_ranges():
     assert "normalize_month_range" in TEXT
 
 
-def test_growth_page_uses_a_separate_equal_period_window_selector():
-    assert 'selectbox("성장 비교기간"' in TEXT
-    assert "available_growth_windows" in TEXT
-    assert "growth_comparison_range" in TEXT
-    assert "초반 3개월 평균 vs 최근 3개월 평균" not in TEXT
+def test_growth_page_uses_year_selector_and_hides_global_date_range():
+    assert 'selectbox("기준 연도"' in TEXT
+    assert "available_growth_years" in TEXT
+    assert "growth_year_comparison_range" in TEXT
+    assert 'if page != "수출 성장":' in TEXT
     assert "현재 비교:" in TEXT
 
 
