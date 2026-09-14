@@ -12,7 +12,7 @@ import streamlit as st
 import urllib3
 
 from customs_pipeline import CustomsClient, refresh_customs_data
-from dashboard_utils import normalize_month_range, quick_month_range, format_100m_usd, industry_period_summary
+from dashboard_utils import normalize_month_range, quick_month_range, format_100m_usd, industry_period_summary, sidebar_guide_sections
 from deployment_mode import allow_admin_controls, is_shared_mode
 from export_analytics import growth_leaders
 from flash_trade import flash_comparison_frame, load_flash_snapshots, refresh_flash_cache
@@ -310,6 +310,10 @@ with st.sidebar:
                 with st.spinner("Mart 재생성 중..."):
                     rebuild_mart()
                 st.cache_data.clear(); st.rerun()
+    with st.expander("📖 사용 가이드", expanded=False):
+        for guide_title, guide_body in sidebar_guide_sections().items():
+            st.markdown(f"#### {guide_title}")
+            st.markdown(guide_body)
 
 st.title("Investment Advisor Tool · v4.1")
 st.caption("Top-down: 실물경기 → 수출 → 산업 → 세부제품 · Mart-first · 금액 단위: 억달러")
