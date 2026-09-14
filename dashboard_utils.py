@@ -5,6 +5,8 @@ from typing import Any
 
 import pandas as pd
 
+from data_lineage import growth_calculation_guide, institution_comparison_guide, page_methodology
+
 USD_PER_100M = 100_000_000.0
 
 
@@ -18,41 +20,13 @@ def sidebar_guide_sections() -> dict[str, str]:
 4. 상단의 빠른 기간 또는 시작·종료일을 바꾸면 선택 기간 기준으로 다시 계산됩니다.
 5. 각 차트 아래 **CSV** 버튼으로 현재 표시 데이터를 받을 수 있습니다.
 """,
-        "종합 현황": """
-한국 총수출과 Top20 합계, 수출 모멘텀, 산업별 실물경기를 한 화면에서 비교합니다. 먼저 방향을 확인한 뒤 세부 화면으로 이동하는 출발점입니다.
-
-**데이터 출처** · [KOSIS 국가통계포털](https://kosis.kr/) · [관세청 OpenAPI](https://www.customs.go.kr/kcs/openApi/view.do) · [산업통상자원부](https://www.motie.go.kr/)
-""",
-        "산업 스크리너": """
-선택 기간의 산업별 펀더멘털 점수, 수출 YoY, 재고순환, 실물·수출 동반개선을 비교합니다. 순위는 주가 전망이 아니라 **실물·수출 선별 신호**입니다.
-
-**데이터 출처** · [KOSIS 국가통계포털](https://kosis.kr/) · [관세청 OpenAPI](https://www.customs.go.kr/kcs/openApi/view.do)
-""",
-        "산업 상세": """
-선택 산업의 생산·출하·재고와 수출 흐름을 같은 기간으로 맞춰 봅니다. 수출 증가가 실제 생산·출하 개선으로 이어지는지 확인할 때 사용합니다.
-
-**데이터 출처** · [KOSIS 국가통계포털](https://kosis.kr/) · [관세청 OpenAPI](https://www.customs.go.kr/kcs/openApi/view.do)
-""",
-        "수출 성장": """
-선택 기간의 산업별 수출 성장률을 비교합니다. 짧은 구간의 기저효과가 클 수 있으므로 수출액 규모와 지속성을 함께 확인해야 합니다.
-
-**데이터 출처** · [관세청 OpenAPI](https://www.customs.go.kr/kcs/openApi/view.do) · [산업통상자원부 수출입 동향](https://www.motie.go.kr/kor/article/ATCL3f49a5a8c/list)
-""",
-        "품목 모니터": """
-산업부 Top20에서 리서치 중분류와 대표품목까지 내려가 수출액·증가율을 확인합니다. HS10 여러 개를 업계에서 읽기 쉬운 대표품목으로 묶은 결과입니다.
-
-**데이터 출처** · [관세청 OpenAPI](https://www.customs.go.kr/kcs/openApi/view.do) · [K-stat 무역통계](https://stat.kita.net/) · [산업통상자원부](https://www.motie.go.kr/)
-""",
-        "종목 후보": """
-대표품목과 관련 기업의 매출 노출 가능성을 연결해 조사 후보를 만듭니다. 자동 매수 신호가 아니며 기업 공시·사업보고서로 실제 노출을 재검증해야 합니다.
-
-**데이터 출처** · 관세청 품목 수출통계 · 내부 `company_exposure.csv` 매핑
-""",
-        "최근 수출": """
-당월 10일·20일·월말 누적 수출을 전년·전월·5년 평균과 비교합니다. 월중 값은 잠정치이며 조업일수 차이를 함께 봐야 합니다.
-
-**데이터 출처** · [산업통상자원부 수출입 동향](https://www.motie.go.kr/kor/article/ATCL3f49a5a8c/list) · [관세청](https://www.customs.go.kr/)
-""",
+        "종합 현황": page_methodology("종합 현황"),
+        "산업 스크리너": page_methodology("산업 스크리너"),
+        "산업 상세": page_methodology("산업 상세"),
+        "수출 성장": page_methodology("수출 성장"),
+        "품목 모니터": page_methodology("품목 모니터"),
+        "종목 후보": page_methodology("종목 후보"),
+        "최근 수출": page_methodology("최근 수출"),
         "지표·점수 해석": """
 - **YoY**: 전년 같은 달 대비 증감률
 - **MoM**: 직전 달 대비 증감률
@@ -69,7 +43,8 @@ def sidebar_guide_sections() -> dict[str, str]:
 - KOSIS-수출 산업 연결: `data/industry_export_bridge.csv`
 
 HS 분류는 통관 품목 기준이므로 기업 매출·주가 노출과 완전히 같지 않습니다. 기업 연결은 별도 Exposure 자료와 함께 검증해야 합니다.
-""",
+
+""" + institution_comparison_guide(),
         "데이터 갱신·웹 반영": """
 GitHub Actions가 매일 **한국시간 오전 8시 30분** 최신 데이터를 확인합니다. 화면 왼쪽의 수출·KOSIS 기준월과 Mart 생성시각으로 반영 여부를 확인하세요.
 
