@@ -104,24 +104,25 @@ def quick_month_range(latest: Any, preset: str, available_start: Any) -> tuple[p
     return max(start, floor), end
 
 
-def available_growth_windows(available_start: Any, comparison_end: Any) -> list[int]:
-    """Return comparison windows with enough history for current and prior periods."""
+def available_growth_years(available_start: Any, available_end: Any) -> list[int]:
+    """Return descending calendar years that have a usable prior-year comparison."""
     start = _month_start(available_start)
-    end = _month_start(comparison_end)
-    available_months = (end.year - start.year) * 12 + end.month - start.month + 1
-    return [months for months in (3, 6, 12, 24) if available_months >= months * 2]
+    end = _month_start(available_end)
+    return list(range(end.year, start.year, -1))
 
 
-def growth_comparison_range(comparison_end: Any, months: int) -> tuple[pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp]:
-    """Return inclusive current and immediately preceding comparison windows."""
-    end = _month_start(comparison_end)
-    months = int(months)
-    if months < 1:
-        raise ValueError("comparison months must be positive")
-    current_start = end - pd.DateOffset(months=months - 1)
-    previous_end = current_start - pd.DateOffset(months=1)
-    previous_start = previous_end - pd.DateOffset(months=months - 1)
-    return current_start, end, previous_start, previous_end
+def growth_year_comparison_range(year: int, available_end: Any) -> tuple[pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp]:
+    """Return annual or YTD current/prior ranges for a selected calendar year."""
+    latest = _month_start(available_end)
+    year = int(year)
+    if year > latest.year:
+        raise ValueError("selected year exceeds available data")
+    last_month = latest.month if year == latest.year else 12
+    current_start = pd.Timestamp(year=year, month=1, day=1)
+    current_end = pd.Timestamp(year=year, month=last_month, day=1)
+    previous_start = pd.Timestamp(year=year - 1, month=1, day=1)
+    previous_end = pd.Timestamp(year=year - 1, month=last_month, day=1)
+    return current_start, current_end, previous_start, previous_end
 
 
 def filter_month_range(df: pd.DataFrame, start: Any, end: Any, date_col: str = "date") -> pd.DataFrame:
