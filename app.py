@@ -15,6 +15,7 @@ from customs_pipeline import CustomsClient, refresh_customs_data
 from dashboard_utils import available_growth_years, growth_year_comparison_range, normalize_month_range, parse_date_text, quick_month_range, format_100m_usd, industry_period_summary, sidebar_guide_sections
 from data_lineage import page_methodology, source_caption
 from deployment_mode import allow_admin_controls, is_shared_mode
+from drilldown_utils import ALL_OPTION, drilldown_options, product_monitor_selection
 from export_analytics import growth_leaders
 from flash_trade import flash_comparison_frame, load_flash_snapshots, refresh_flash_cache
 from kosis_cache import read_kosis_cache, write_kosis_cache
@@ -569,35 +570,79 @@ def render_growth_leaders():
 def render_product_monitor():
     dims=q("SELECT DISTINCT item20,middle_category,product FROM dim_product_taxonomy ORDER BY item20,middle_category,product")
     if dims.empty: st.info("Taxonomy 없음"); return
+
+    def reset_from_item():
+        st.session_state["pm_mid"] = ALL_OPTION
+        st.session_state["pm_prod"] = ALL_OPTION
+
+    def reset_from_middle():
+        st.session_state["pm_prod"] = ALL_OPTION
+
     c1,c2,c3=st.columns(3)
-    item=c1.selectbox("Top20",dims["item20"].drop_duplicates().tolist(),key="pm_item")
-    mids=dims[dims["item20"]==item]["middle_category"].drop_duplicates().tolist(); mid=c2.selectbox("리서치중분류",mids,key="pm_mid")
-    prods=dims[(dims["item20"]==item)&(dims["middle_category"]==mid)]["product"].drop_duplicates().tolist(); product=c3.selectbox("대표품목",prods,key="pm_prod")
-    hist=month_sql("mart_export_product_monthly",period_start,period_end,"AND item20=? AND middle_category=? AND product=?",(item,mid,product))
-    if hist.empty: st.info("선택 기간 제품 데이터 없음"); return
+    items=dims["item20"].drop_duplicates().tolist()
+    item=c1.selectbox("Top20",items,key="pm_item",on_change=reset_from_item)
+    mids,_=drilldown_options(dims,item,ALL_OPTION)
+    if st.session_state.get("pm_mid") not in mids:
+        st.session_state["pm_mid"] = ALL_OPTION
+    mid=c2.selectbox("리서치중분류",mids,key="pm_mid",on_change=reset_from_middle)
+    _,prods=drilldown_options(dims,item,mid)
+    if st.session_state.get("pm_prod") not in prods:
+        st.session_state["pm_prod"] = ALL_OPTION
+    product=c3.selectbox("대표품목",prods,key="pm_prod")
+
+    table,extra,params,label=product_monitor_selection(item,mid,product)
+    hist=month_sql(table,period_start,period_end,extra,params)
+    if hist.empty: st.info("선택 기간 데이터 없음"); return
     latest=hist.iloc[-1]; k1,k2,k3,k4=st.columns(4); k1.metric("수출",usd100m(latest["export_usd"]),pct(latest["yoy_pct"])); k2.metric("MoM",pct(latest["mom_pct"])); k3.metric("중량",f"{latest['export_weight']/1e6:.1f}M" if pd.notna(latest['export_weight']) else "-"); k4.metric("수출단가",f"${latest['unit_price_usd_per_kg']:,.1f}/kg" if pd.notna(latest['unit_price_usd_per_kg']) else "-")
     c4,c5=st.columns(2)
     with c4:
-        p=hist.copy(); p["수출_억달러"]=p["export_usd"]/1e8; fig=px.line(p,x="date",y="수출_억달러",title=f"{product} · 수출액")
-        render_chart(fig_layout(fig,350,"억달러",False),source_key="customs_item",csv_df=p,csv_name=f"{product}_export",key="pm1")
+        p=hist.copy(); p["수출_억달러"]=p["export_usd"]/1e8; fig=px.line(p,x="date",y="수출_억달러",title=f"{label} · 수출액")
+        render_chart(fig_layout(fig,350,"억달러",False),source_key="customs_item",csv_df=p,csv_name=f"{label}_export",key="pm1")
     with c5:
-        fig=go.Figure(); fig.add_trace(go.Scatter(x=hist["date"],y=hist["yoy_pct"],name="YoY")); fig.add_trace(go.Scatter(x=hist["date"],y=hist["mom_pct"],name="MoM")); fig.add_hline(y=0,line_dash="dash"); fig.update_layout(title=f"{product} · 성장률")
-        render_chart(fig_layout(fig,350,"%"),source_key="customs_item",csv_df=hist,csv_name=f"{product}_growth",key="pm2")
-    country=month_sql("mart_product_country_monthly",period_start,period_end,"AND item20=? AND middle_category=? AND product=?",(item,mid,product))
+        fig=go.Figure(); fig.add_trace(go.Scatter(x=hist["date"],y=hist["yoy_pct"],name="YoY")); fig.add_trace(go.Scatter(x=hist["date"],y=hist["mom_pct"],name="MoM")); fig.add_hline(y=0,line_dash="dash"); fig.update_layout(title=f"{label} · 성장률")
+        render_chart(fig_layout(fig,350,"%"),source_key="customs_item",csv_df=hist,csv_name=f"{label}_growth",key="pm2")
+
+    country_where=["date>=?","date<=?","item20=?"]
+    country_params=[period_start.strftime("%Y-%m-%d"),period_end.strftime("%Y-%m-%d"),item]
+    if mid != ALL_OPTION:
+        country_where.append("middle_category=?"); country_params.append(mid)
+    if product != ALL_OPTION:
+        country_where.append("product=?"); country_params.append(product)
+    country=q(
+        f"""SELECT date,country_code,
+                   SUM(export_usd) AS export_usd,
+                   SUM(import_usd) AS import_usd,
+                   SUM(export_weight) AS export_weight,
+                   SUM(import_weight) AS import_weight,
+                   SUM(balance_usd) AS balance_usd
+            FROM mart_product_country_monthly
+            WHERE {' AND '.join(country_where)}
+            GROUP BY date,country_code
+            ORDER BY date,country_code""",
+        tuple(country_params),
+    )
+    if not country.empty:
+        country["unit_price_usd_per_kg"]=country["export_usd"].div(country["export_weight"].replace(0,np.nan))
+
     c6,c7=st.columns(2)
     with c6:
         if not country.empty:
             last=country[country["date"]==country["date"].max()].copy(); last["수출_억달러"]=last["export_usd"]/1e8; last=last.sort_values("수출_억달러")
             fig=px.bar(last,y="country_code",x="수출_억달러",orientation="h",title="추적국가별 수출 · 최신월")
-            render_chart(fig_layout(fig,350,"억달러",False),source_key="customs_item_country",csv_df=last,csv_name=f"{product}_country",key="pm3")
-        else: st.info("현재 DB에 이 대표품목의 국가별 데이터가 없습니다.")
+            render_chart(fig_layout(fig,350,"억달러",False),source_key="customs_item_country",csv_df=last,csv_name=f"{label}_country",key="pm3")
+        else: st.info("현재 DB에 이 선택항목의 국가별 데이터가 없습니다.")
     with c7:
         if not country.empty:
             countries=country["country_code"].drop_duplicates().tolist(); cc=st.selectbox("단가 국가",countries,key="pm_country"); cp=country[country["country_code"]==cc].copy()
             fig=px.line(cp,x="date",y="unit_price_usd_per_kg",title=f"{cc} · 수출단가",labels={"unit_price_usd_per_kg":"USD/kg"})
-            render_chart(fig_layout(fig,350,"USD/kg",False),source_key="customs_item_country",csv_df=cp,csv_name=f"{product}_{cc}_unitprice",key="pm4")
+            render_chart(fig_layout(fig,350,"USD/kg",False),source_key="customs_item_country",csv_df=cp,csv_name=f"{label}_{cc}_unitprice",key="pm4")
     with st.expander("HS10 lineage",expanded=False):
-        lin=q("SELECT hsk10,display_name,hs6,mti6,classification_status,classification_note FROM dim_product_taxonomy WHERE item20=? AND middle_category=? AND product=? ORDER BY hsk10",(item,mid,product))
+        if mid == ALL_OPTION:
+            lin=q("SELECT hsk10,display_name,hs6,mti6,classification_status,classification_note FROM dim_product_taxonomy WHERE item20=? ORDER BY middle_category,product,hsk10",(item,))
+        elif product == ALL_OPTION:
+            lin=q("SELECT hsk10,display_name,hs6,mti6,classification_status,classification_note FROM dim_product_taxonomy WHERE item20=? AND middle_category=? ORDER BY product,hsk10",(item,mid))
+        else:
+            lin=q("SELECT hsk10,display_name,hs6,mti6,classification_status,classification_note FROM dim_product_taxonomy WHERE item20=? AND middle_category=? AND product=? ORDER BY hsk10",(item,mid,product))
         st.dataframe(lin,hide_index=True,width="stretch")
         st.caption("HS가 제품을 완전히 분리하지 못하는 경우 국가·중량·단가를 함께 보며 Proxy로 해석합니다.")
 
