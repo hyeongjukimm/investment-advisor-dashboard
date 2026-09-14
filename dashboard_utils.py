@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from datetime import datetime
 from typing import Any
 
 import pandas as pd
@@ -8,6 +9,22 @@ import pandas as pd
 from data_lineage import growth_calculation_guide, institution_comparison_guide, page_methodology
 
 USD_PER_100M = 100_000_000.0
+
+
+def parse_date_text(value: Any) -> pd.Timestamp:
+    """Parse YYMMDD, YYYYMMDD, or YYYY-MM-DD into a calendar date."""
+    text = str(value).strip()
+    try:
+        if len(text) == 6 and text.isdigit():
+            year = 2000 + int(text[:2])
+            parsed = datetime(year, int(text[2:4]), int(text[4:6]))
+        elif len(text) == 8 and text.isdigit():
+            parsed = datetime.strptime(text, "%Y%m%d")
+        else:
+            parsed = datetime.strptime(text, "%Y-%m-%d")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("날짜를 260901, 20260901 또는 2026-09-01 형식으로 입력하세요.") from exc
+    return pd.Timestamp(parsed.date())
 
 
 def sidebar_guide_sections() -> dict[str, str]:
