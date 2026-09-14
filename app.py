@@ -289,6 +289,15 @@ if mart is None:
 is_share = mart == SHARE_MART and not LOCAL_MART.exists()
 status = mart_status(mart)
 
+
+@st.dialog("Investment Advisor 사용 가이드북", width="large")
+def render_guidebook():
+    st.caption("기능을 선택해 사용법·산출 기준·데이터 출처를 확인하세요.")
+    for index, (guide_title, guide_body) in enumerate(sidebar_guide_sections().items()):
+        with st.expander(guide_title, expanded=index == 0):
+            st.markdown(guide_body)
+
+
 with st.sidebar:
     st.markdown("### 데이터 상태")
     st.caption(f"모드: {'Portable / Share' if is_share else 'Local Research'}")
@@ -310,10 +319,8 @@ with st.sidebar:
                 with st.spinner("Mart 재생성 중..."):
                     rebuild_mart()
                 st.cache_data.clear(); st.rerun()
-    with st.expander("📖 사용 가이드", expanded=False):
-        for guide_title, guide_body in sidebar_guide_sections().items():
-            st.markdown(f"#### {guide_title}")
-            st.markdown(guide_body)
+    if st.button("📘 사용 가이드북 열기", width="stretch"):
+        render_guidebook()
 
 st.title("Investment Advisor Tool · v4.1")
 st.caption("Top-down: 실물경기 → 수출 → 산업 → 세부제품 · Mart-first · 금액 단위: 억달러")
