@@ -1,0 +1,9 @@
+Investment Advisor Tool v4.1 Windows patch (2026-09-14)
+
+- Export Flash -> 최근 수출, canonical/legacy CSV schema compatibility
+- Industry Scanner -> 산업 스크리너, selected-period average/change metrics
+- Korean navigation and key scanner labels
+- KOSIS 12-month safe chunks, real err/errMsg display, skip err 30 no-data ranges
+
+Apply: extract this patch into the existing investment_advisor_READY_v4.1 folder
+and overwrite files, then restart START_WINDOWS.bat.

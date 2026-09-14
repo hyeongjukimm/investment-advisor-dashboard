@@ -1,0 +1,41 @@
+from pathlib import Path
+
+APP = Path(__file__).resolve().parents[1] / "app.py"
+TEXT = APP.read_text(encoding="utf-8")
+
+
+def test_v4_is_mart_first_and_lazy_pages():
+    assert "Investment Advisor Tool · v4" in TEXT
+    assert "resolve_mart_path" in TEXT
+    assert "st.tabs(" not in TEXT
+    assert "page = st.radio(" in TEXT
+
+
+def test_v4_has_calendar_controls_and_quick_ranges():
+    assert ".date_input(" in TEXT
+    assert '"1Y", "3Y", "5Y", "10Y", "전체"' in TEXT
+    assert "normalize_month_range" in TEXT
+
+
+def test_navigation_and_flash_page_use_korean_labels_and_canonical_schema():
+    for label in ["종합 현황", "산업 스크리너", "산업 상세", "수출 성장", "품목 모니터", "종목 후보", "최근 수출", "데이터 점검"]:
+        assert label in TEXT
+    assert 'current["checkpoint_day"]' in TEXT
+    assert 'latest["export_usd_m"]' in TEXT
+    assert 'current["checkpoint_days"]' not in TEXT
+
+
+def test_v4_has_explicit_local_refresh_only():
+    assert "관세청 + Mart 최신화" in TEXT
+    assert "KOSIS + Mart 최신화" in TEXT
+    assert "실행 시 관세청 최신화" not in TEXT
+
+
+def test_v4_trade_units_are_100m_usd():
+    assert "억달러" in TEXT
+    assert "format_100m_usd" in TEXT
+
+
+def test_v4_download_helper_is_not_monkey_patch():
+    assert "def render_chart(" in TEXT
+    assert "st.plotly_chart =" not in TEXT

@@ -1,0 +1,15 @@
+.streamlit/secrets.toml
+__pycache__/
+*.pyc
+
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+.venv/
+investment_advisor_v4_PORTABLE_*.zip
+data/investment_advisor.sqlite
+data/investment_mart.sqlite
+data/*.candidate.sqlite
+!data/share_snapshot.sqlite
+raw-state*.zip
+.pytest_cache/
