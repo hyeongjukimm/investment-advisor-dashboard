@@ -36,7 +36,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release download data-state --pattern raw-state.zip
-          unzip -o raw-state.zip
+          mkdir -p data
+          unzip -o raw-state.zip -d data
           test -f data/investment_advisor.sqlite
       - name: API 갱신 및 공유 Mart 생성
         run: python scheduled_refresh.py
