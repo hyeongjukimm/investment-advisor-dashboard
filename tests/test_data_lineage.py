@@ -23,12 +23,12 @@ def test_source_caption_is_compact_and_does_not_expose_credentials():
     assert "serviceKey" not in caption
 
 
-def test_growth_methodology_matches_equal_period_window_selector():
+def test_growth_methodology_matches_annual_and_ytd_comparison():
     guide = growth_calculation_guide()
-    assert "최근 3·6·12·24개월" in guide
-    assert "직전 동일 길이 기간" in guide
-    assert "상단 시작일" in guide
-    assert "첫 3개월 월평균" not in guide
+    assert "완료된 연도" in guide
+    assert "진행 중인 연도" in guide
+    assert "전년 같은 월까지" in guide
+    assert "기준 연도" in guide
     assert "100,000,000" in guide
     assert "미매핑 HS10" in guide
 
