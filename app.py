@@ -13,6 +13,7 @@ import urllib3
 
 from customs_pipeline import CustomsClient, refresh_customs_data
 from dashboard_utils import normalize_month_range, quick_month_range, format_100m_usd, industry_period_summary, sidebar_guide_sections
+from data_lineage import page_methodology, source_caption
 from deployment_mode import allow_admin_controls, is_shared_mode
 from export_analytics import growth_leaders
 from flash_trade import flash_comparison_frame, load_flash_snapshots, refresh_flash_cache
@@ -184,7 +185,7 @@ def _figure_frame(fig: go.Figure) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
-def render_chart(fig: go.Figure, *, csv_df: pd.DataFrame | None = None, csv_name: str = "chart", key: str | None = None, selectable: bool = False):
+def render_chart(fig: go.Figure, *, source_key: str, csv_df: pd.DataFrame | None = None, csv_name: str = "chart", key: str | None = None, selectable: bool = False):
     kwargs = {"width": "stretch"}
     if key:
         kwargs["key"] = key
@@ -205,6 +206,7 @@ def render_chart(fig: go.Figure, *, csv_df: pd.DataFrame | None = None, csv_name
                 help="현재 차트에 표출된 데이터",
                 width="content",
             )
+    st.caption(source_caption(source_key))
     return event
 
 
@@ -346,6 +348,9 @@ with st.container(border=True):
     period_start, period_end = normalize_month_range(start_date, end_date)
     r4.metric("표시 기간", f"{period_start:%Y.%m}–{period_end:%Y.%m}")
 
+with st.expander("ⓘ 데이터·산출 기준", expanded=False):
+    st.markdown(page_methodology(page))
+
 
 # -----------------------------------------------------------------------------
 # Pages
@@ -375,21 +380,21 @@ def render_overview():
         fig=go.Figure(); fig.add_trace(go.Scatter(x=a["date"],y=a["Top20_억달러"],name="Top20"))
         if not total.empty: fig.add_trace(go.Scatter(x=total["date"],y=total["total_export_usd"]/1e8,name="총수출"))
         fig.update_layout(title="① 한국 총수출 vs Top20")
-        render_chart(fig_layout(fig,330,"억달러"),csv_df=a,csv_name="overview_total_vs_top20",key="ov1")
+        render_chart(fig_layout(fig,330,"억달러"),source_key="mapping",csv_df=a,csv_name="overview_total_vs_top20",key="ov1")
     with c2:
         fig=go.Figure(); fig.add_trace(go.Scatter(x=agg["date"],y=agg["top20_yoy"],name="Top20 YoY"))
         if not total.empty: fig.add_trace(go.Scatter(x=total["date"],y=total["total_yoy_pct"],name="총수출 YoY"))
         fig.add_hline(y=0,line_dash="dash"); fig.update_layout(title="② 수출 모멘텀")
-        render_chart(fig_layout(fig,330,"YoY (%)"),csv_df=agg,csv_name="overview_export_yoy",key="ov2")
+        render_chart(fig_layout(fig,330,"YoY (%)"),source_key="customs_item",csv_df=agg,csv_name="overview_export_yoy",key="ov2")
 
     c3,c4=st.columns(2)
     with c3:
         p=snap.sort_values("yoy_pct"); fig=px.bar(p,y="item20",x="yoy_pct",orientation="h",title=f"③ Top20 최신 YoY · {latest:%Y.%m}",labels={"item20":"","yoy_pct":"YoY (%)"}); fig.add_vline(x=0,line_dash="dash")
-        render_chart(fig_layout(fig,420,"YoY (%)",False),csv_df=p,csv_name="overview_top20_yoy",key="ov3")
+        render_chart(fig_layout(fig,420,"YoY (%)",False),source_key="customs_item",csv_df=p,csv_name="overview_top20_yoy",key="ov3")
     with c4:
         p=snap.copy(); p["수출_억달러"]=p["export_usd"]/1e8; p["bubble"]=p["수출_억달러"].clip(lower=.2)
         fig=px.scatter(p,x="수출_억달러",y="yoy_pct",size="bubble",text="item20",title="④ 규모 × 성장",labels={"수출_억달러":"억달러","yoy_pct":"YoY (%)"}); fig.add_hline(y=0,line_dash="dash"); fig.update_traces(textposition="top center")
-        render_chart(fig_layout(fig,420,"YoY (%)",False),csv_df=p,csv_name="overview_size_growth",key="ov4")
+        render_chart(fig_layout(fig,420,"YoY (%)",False),source_key="customs_item",csv_df=p,csv_name="overview_size_growth",key="ov4")
 
     c5,c6=st.columns(2)
     with c5:
@@ -398,12 +403,12 @@ def render_overview():
             fig=go.Figure()
             for col,name in [("production_yoy","생산"),("shipment_yoy","출하"),("inventory_yoy","재고")]: fig.add_trace(go.Scatter(x=ka["date"],y=ka[col],name=name))
             fig.add_hline(y=0,line_dash="dash"); fig.update_layout(title="⑤ KOSIS 연결업종 평균")
-            render_chart(fig_layout(fig,330,"YoY (%)"),csv_df=ka,csv_name="overview_kosis",key="ov5")
+            render_chart(fig_layout(fig,330,"YoY (%)"),source_key="kosis_cycle",csv_df=ka,csv_name="overview_kosis",key="ov5")
         else: st.info("⑤ KOSIS 캐시가 없습니다.")
     with c6:
         if not latest_signal.empty:
             p=latest_signal.sort_values("fundamental_score"); fig=px.bar(p,y="item20",x="fundamental_score",orientation="h",title="⑥ Fundamental Score",labels={"item20":"","fundamental_score":"Score"},hover_data=["export_momentum_score","inventory_cycle_score","real_activity_score","breadth_score","persistence_score","score_note"])
-            render_chart(fig_layout(fig,420,"Score",False),csv_df=p,csv_name="overview_fundamental_score",key="ov6")
+            render_chart(fig_layout(fig,420,"Score",False),source_key="customs_kosis",csv_df=p,csv_name="overview_fundamental_score",key="ov6")
         else: st.info("⑥ Fundamental Score는 KOSIS 연결 후 생성됩니다.")
 
     c7,c8=st.columns(2)
@@ -411,13 +416,13 @@ def render_overview():
         if not latest_signal.empty:
             p=latest_signal.copy(); p["bubble"]=p["export_usd"].clip(lower=1)
             fig=px.scatter(p,x="inventory_cycle",y="export_yoy",size="bubble",color="stage",text="item20",title="⑦ 재고순환 × 수출 YoY",labels={"inventory_cycle":"재고순환 (pp)","export_yoy":"수출 YoY (%)"}); fig.add_hline(y=0,line_dash="dash"); fig.add_vline(x=0,line_dash="dash"); fig.update_traces(textposition="top center")
-            render_chart(fig_layout(fig,420,"수출 YoY (%)",True),csv_df=p,csv_name="overview_cross_signal",key="ov7")
+            render_chart(fig_layout(fig,420,"수출 YoY (%)",True),source_key="customs_kosis",csv_df=p,csv_name="overview_cross_signal",key="ov7")
         else: st.info("⑦ Cross Signal은 KOSIS 연결 후 생성됩니다.")
     with c8:
         if not middle.empty:
             ms=middle[middle["date"]==middle["date"].max()].dropna(subset=["yoy_pct"]).nlargest(15,"yoy_pct").sort_values("yoy_pct")
             fig=px.bar(ms,y="middle_category",x="yoy_pct",orientation="h",title="⑧ 리서치중분류 수출 YoY 상위",labels={"middle_category":"","yoy_pct":"YoY (%)"}); fig.add_vline(x=0,line_dash="dash")
-            render_chart(fig_layout(fig,420,"YoY (%)",False),csv_df=ms,csv_name="overview_middle_yoy",key="ov8")
+            render_chart(fig_layout(fig,420,"YoY (%)",False),source_key="customs_item",csv_df=ms,csv_name="overview_middle_yoy",key="ov8")
 
 
 def render_industry_scanner():
@@ -444,16 +449,16 @@ def render_industry_scanner():
     c1,c2=st.columns(2)
     with c1:
         p=snap.sort_values("fundamental_score"); fig=go.Figure(); fig.add_trace(go.Bar(y=p["item20"],x=p["period_avg_score"],name="기간평균",orientation="h")); fig.add_trace(go.Bar(y=p["item20"],x=p["fundamental_score"],name="현재",orientation="h")); fig.update_layout(title=f"산업 펀더멘털 점수 · {latest:%Y.%m}",barmode="group")
-        render_chart(fig_layout(fig,450,"점수",True),csv_df=p,csv_name="industry_fundamental_score",key="scan1")
+        render_chart(fig_layout(fig,450,"점수",True),source_key="customs_kosis",csv_df=p,csv_name="industry_fundamental_score",key="scan1")
     with c2:
         p=snap.copy(); p["bubble"]=p["export_usd"].clip(lower=1); fig=px.scatter(p,x="inventory_cycle",y="export_yoy",size="bubble",color="fundamental_score",text="item20",title="수출 × 재고순환",labels={"inventory_cycle":"재고순환 (pp)","export_yoy":"수출 YoY (%)","fundamental_score":"현재점수"},hover_data=["period_avg_score","period_change_score","breadth_pct","persistence_pct","score_note"]); fig.add_hline(y=0,line_dash="dash"); fig.add_vline(x=0,line_dash="dash"); fig.update_traces(textposition="top center")
-        render_chart(fig_layout(fig,450,"수출 YoY (%)",False),csv_df=p,csv_name="industry_cross",key="scan2")
+        render_chart(fig_layout(fig,450,"수출 YoY (%)",False),source_key="customs_kosis",csv_df=p,csv_name="industry_cross",key="scan2")
     item=st.selectbox("점수 추이 산업",snap["item20"].tolist(),key="scan_item")
     hist=signal[signal["item20"]==item].copy()
     c3,c4=st.columns([1.2,1])
     with c3:
         fig=go.Figure(); fig.add_trace(go.Scatter(x=hist["date"],y=hist["fundamental_score"],name="산업 펀더멘털 점수")); fig.update_layout(title=f"{item} · 점수 추이")
-        render_chart(fig_layout(fig,340,"점수",False),csv_df=hist,csv_name=f"{item}_score_history",key="scan3")
+        render_chart(fig_layout(fig,340,"점수",False),source_key="customs_kosis",csv_df=hist,csv_name=f"{item}_score_history",key="scan3")
     with c4:
         table=snap[["item20","fundamental_score","period_avg_score","period_change_score","export_momentum_score","inventory_cycle_score","real_activity_score","breadth_score","persistence_score","export_yoy","inventory_cycle","score_note"]].copy()
         table.columns=["산업","현재점수","기간평균","기간변화","수출모멘텀","재고순환","실물활동","확산도","지속성","수출 YoY","재고순환 pp","판정"]
@@ -478,21 +483,21 @@ def render_industry_detail():
     c1,c2=st.columns(2)
     with c1:
         p=exp.copy(); p["수출_억달러"]=p["export_usd"]/1e8; fig=px.line(p,x="date",y="수출_억달러",title=f"{item} · 수출액")
-        render_chart(fig_layout(fig,350,"억달러",False),csv_df=p,csv_name=f"{item}_export",key="det1")
+        render_chart(fig_layout(fig,350,"억달러",False),source_key="customs_item",csv_df=p,csv_name=f"{item}_export",key="det1")
     with c2:
         fig=go.Figure(); fig.add_trace(go.Scatter(x=exp["date"],y=exp["yoy_pct"],name="수출 YoY"));
         if not sig.empty: fig.add_trace(go.Scatter(x=sig["date"],y=sig["inventory_cycle"],name="재고순환"))
         fig.add_hline(y=0,line_dash="dash"); fig.update_layout(title=f"{item} · 수출 vs 재고순환")
-        render_chart(fig_layout(fig,350,"%, pp"),csv_df=exp,csv_name=f"{item}_signal",key="det2")
+        render_chart(fig_layout(fig,350,"%, pp"),source_key="customs_kosis",csv_df=exp,csv_name=f"{item}_signal",key="det2")
     c3,c4=st.columns(2)
     with c3:
         if not middle.empty:
             m=middle[middle["date"]==middle["date"].max()].dropna(subset=["yoy_pct"]).sort_values("yoy_pct"); fig=px.bar(m,y="middle_category",x="yoy_pct",orientation="h",title="리서치중분류 · 최신 YoY"); fig.add_vline(x=0,line_dash="dash")
-            render_chart(fig_layout(fig,430,"YoY (%)",False),csv_df=m,csv_name=f"{item}_middle",key="det3")
+            render_chart(fig_layout(fig,430,"YoY (%)",False),source_key="customs_item",csv_df=m,csv_name=f"{item}_middle",key="det3")
     with c4:
         if not product.empty:
             p=product[product["date"]==product["date"].max()].dropna(subset=["yoy_pct"]).nlargest(20,"yoy_pct").sort_values("yoy_pct"); fig=px.bar(p,y="product",x="yoy_pct",orientation="h",title="대표품목 · 최신 YoY"); fig.add_vline(x=0,line_dash="dash")
-            render_chart(fig_layout(fig,430,"YoY (%)",False),csv_df=p,csv_name=f"{item}_products",key="det4")
+            render_chart(fig_layout(fig,430,"YoY (%)",False),source_key="customs_item",csv_df=p,csv_name=f"{item}_products",key="det4")
 
 
 def _leaders_source(level: str, top20: str | None, middle: str | None) -> tuple[pd.DataFrame,str,str]:
@@ -526,9 +531,9 @@ def render_growth_leaders():
     k1,k2,k3,k4=st.columns(4); k1.metric("성장률 1위",f"{show.iloc[0]['entity']} · {show.iloc[0]['growth_pct']:+.1f}%"); inc=show.sort_values("absolute_increase_usd",ascending=False).iloc[0]; k2.metric("증가액 1위",f"{inc['entity']} · {inc['증가액_억달러']:+.1f}억달러"); con=show.sort_values("contribution_pct",ascending=False).iloc[0]; k3.metric("기여도 1위",f"{con['entity']} · {con['contribution_pct']:+.1f}%"); k4.metric("성장 항목",f"{int((show['growth_pct']>0).sum())}/{len(show)}")
     c1,c2=st.columns(2)
     with c1:
-        rank=show.nlargest(15,"growth_pct").sort_values("growth_pct"); fig=px.bar(rank,y="entity",x="growth_pct",orientation="h",title=f"{label} · 성장률 상위"); event1=render_chart(fig_layout(fig,410,"%",False),csv_df=rank,csv_name=f"growth_{label}",key=f"gl1_{level}_{top20}_{middle}",selectable=level!="대표품목")
+        rank=show.nlargest(15,"growth_pct").sort_values("growth_pct"); fig=px.bar(rank,y="entity",x="growth_pct",orientation="h",title=f"{label} · 성장률 상위"); event1=render_chart(fig_layout(fig,410,"%",False),source_key="customs_item",csv_df=rank,csv_name=f"growth_{label}",key=f"gl1_{level}_{top20}_{middle}",selectable=level!="대표품목")
     with c2:
-        rank2=show.nlargest(15,"absolute_increase_usd").sort_values("증가액_억달러"); fig=px.bar(rank2,y="entity",x="증가액_억달러",orientation="h",title=f"{label} · 절대 증가액"); event2=render_chart(fig_layout(fig,410,"억달러",False),csv_df=rank2,csv_name=f"growth_inc_{label}",key=f"gl2_{level}_{top20}_{middle}",selectable=level!="대표품목")
+        rank2=show.nlargest(15,"absolute_increase_usd").sort_values("증가액_억달러"); fig=px.bar(rank2,y="entity",x="증가액_억달러",orientation="h",title=f"{label} · 절대 증가액"); event2=render_chart(fig_layout(fig,410,"억달러",False),source_key="customs_item",csv_df=rank2,csv_name=f"growth_inc_{label}",key=f"gl2_{level}_{top20}_{middle}",selectable=level!="대표품목")
     if level!="대표품목":
         clicked=selected_point_label(event1) or selected_point_label(event2)
         valid=set(show["entity"].astype(str))
@@ -540,7 +545,7 @@ def render_growth_leaders():
     c3,c4=st.columns([1.15,1])
     with c3:
         bubble=show.head(40).copy(); bubble["bubble"]=bubble["absolute_increase_usd"].abs().clip(lower=1); fig=px.scatter(bubble,x="기간수출_억달러",y="growth_pct",size="bubble",text="entity",title=f"{label} · 규모 × 성장률"); fig.add_hline(y=0,line_dash="dash"); fig.update_traces(textposition="top center")
-        render_chart(fig_layout(fig,390,"%",False),csv_df=bubble,csv_name=f"growth_bubble_{label}",key=f"gl3_{level}_{top20}_{middle}")
+        render_chart(fig_layout(fig,390,"%",False),source_key="customs_item",csv_df=bubble,csv_name=f"growth_bubble_{label}",key=f"gl3_{level}_{top20}_{middle}")
     with c4:
         table=show[["entity","growth_pct","증가액_억달러","contribution_pct","기간수출_억달러","avg_yoy_pct","latest_yoy_pct"]].head(25)
         st.dataframe(table,hide_index=True,width="stretch",height=365)
@@ -559,23 +564,23 @@ def render_product_monitor():
     c4,c5=st.columns(2)
     with c4:
         p=hist.copy(); p["수출_억달러"]=p["export_usd"]/1e8; fig=px.line(p,x="date",y="수출_억달러",title=f"{product} · 수출액")
-        render_chart(fig_layout(fig,350,"억달러",False),csv_df=p,csv_name=f"{product}_export",key="pm1")
+        render_chart(fig_layout(fig,350,"억달러",False),source_key="customs_item",csv_df=p,csv_name=f"{product}_export",key="pm1")
     with c5:
         fig=go.Figure(); fig.add_trace(go.Scatter(x=hist["date"],y=hist["yoy_pct"],name="YoY")); fig.add_trace(go.Scatter(x=hist["date"],y=hist["mom_pct"],name="MoM")); fig.add_hline(y=0,line_dash="dash"); fig.update_layout(title=f"{product} · 성장률")
-        render_chart(fig_layout(fig,350,"%"),csv_df=hist,csv_name=f"{product}_growth",key="pm2")
+        render_chart(fig_layout(fig,350,"%"),source_key="customs_item",csv_df=hist,csv_name=f"{product}_growth",key="pm2")
     country=month_sql("mart_product_country_monthly",period_start,period_end,"AND item20=? AND middle_category=? AND product=?",(item,mid,product))
     c6,c7=st.columns(2)
     with c6:
         if not country.empty:
             last=country[country["date"]==country["date"].max()].copy(); last["수출_억달러"]=last["export_usd"]/1e8; last=last.sort_values("수출_억달러")
             fig=px.bar(last,y="country_code",x="수출_억달러",orientation="h",title="추적국가별 수출 · 최신월")
-            render_chart(fig_layout(fig,350,"억달러",False),csv_df=last,csv_name=f"{product}_country",key="pm3")
+            render_chart(fig_layout(fig,350,"억달러",False),source_key="customs_item_country",csv_df=last,csv_name=f"{product}_country",key="pm3")
         else: st.info("현재 DB에 이 대표품목의 국가별 데이터가 없습니다.")
     with c7:
         if not country.empty:
             countries=country["country_code"].drop_duplicates().tolist(); cc=st.selectbox("단가 국가",countries,key="pm_country"); cp=country[country["country_code"]==cc].copy()
             fig=px.line(cp,x="date",y="unit_price_usd_per_kg",title=f"{cc} · 수출단가",labels={"unit_price_usd_per_kg":"USD/kg"})
-            render_chart(fig_layout(fig,350,"USD/kg",False),csv_df=cp,csv_name=f"{product}_{cc}_unitprice",key="pm4")
+            render_chart(fig_layout(fig,350,"USD/kg",False),source_key="customs_item_country",csv_df=cp,csv_name=f"{product}_{cc}_unitprice",key="pm4")
     with st.expander("HS10 lineage",expanded=False):
         lin=q("SELECT hsk10,display_name,hs6,mti6,classification_status,classification_note FROM dim_product_taxonomy WHERE item20=? AND middle_category=? AND product=? ORDER BY hsk10",(item,mid,product))
         st.dataframe(lin,hide_index=True,width="stretch")
@@ -622,11 +627,11 @@ def render_export_flash():
     comp=flash_comparison_frame(flash,month,int(latest["checkpoint_day"])); c1,c2=st.columns(2)
     with c1:
         fig=px.line(current,x="checkpoint_day",y=current["export_usd_m"]/100,markers=True,title=f"{month} · 10일→20일→월말",labels={"checkpoint_day":"누적 일수","y":"억달러"})
-        render_chart(fig_layout(fig,350,"억달러",False),csv_df=current,csv_name=f"flash_{month}",key="flash1")
+        render_chart(fig_layout(fig,350,"억달러",False),source_key="flash",csv_df=current,csv_name=f"flash_{month}",key="flash1")
     with c2:
         if not comp.empty:
             comp=comp.copy(); comp["수출_억달러"]=comp["export_usd_m"]/100; fig=px.bar(comp,x="comparison",y="수출_억달러",title="전년·전월·5년평균 비교")
-            render_chart(fig_layout(fig,350,"억달러",False),csv_df=comp,csv_name=f"flash_compare_{month}",key="flash2")
+            render_chart(fig_layout(fig,350,"억달러",False),source_key="flash",csv_df=comp,csv_name=f"flash_compare_{month}",key="flash2")
 
 
 def render_data_qc():
@@ -635,7 +640,7 @@ def render_data_qc():
     c1,c2=st.columns(2)
     with c1:
         if not total.empty:
-            fig=px.line(total,x="date",y="mapped_value_pct",title="2026 고정 taxonomy Value Coverage"); render_chart(fig_layout(fig,350,"%",False),csv_df=total,csv_name="mapping_coverage",key="qc1")
+            fig=px.line(total,x="date",y="mapped_value_pct",title="2026 고정 taxonomy Value Coverage"); render_chart(fig_layout(fig,350,"%",False),source_key="mapping",csv_df=total,csv_name="mapping_coverage",key="qc1")
     with c2:
         meta=q("SELECT * FROM mart_metadata ORDER BY key"); st.dataframe(meta,hide_index=True,width="stretch",height=335)
     with st.expander("Taxonomy 샘플",expanded=False): st.dataframe(tax.head(200),hide_index=True,width="stretch")
