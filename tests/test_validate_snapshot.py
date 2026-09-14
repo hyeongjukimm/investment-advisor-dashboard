@@ -23,6 +23,17 @@ def test_validate_snapshot_rejects_missing_tables_and_empty_top20(tmp_path):
     with pytest.raises(SnapshotValidationError): validate_snapshot(empty)
 
 
+def test_validate_snapshot_rejects_internal_month_gap(tmp_path):
+    gapped = tmp_path / "gapped.sqlite"
+    _db(gapped)
+    with sqlite3.connect(gapped) as con:
+        con.execute("DELETE FROM mart_export_top20_monthly")
+        con.execute("INSERT INTO mart_export_top20_monthly VALUES('2020-01-01','A')")
+        con.execute("INSERT INTO mart_export_top20_monthly VALUES('2020-03-01','A')")
+    with pytest.raises(SnapshotValidationError, match="월 누락"):
+        validate_snapshot(gapped)
+
+
 def test_validate_and_promote_preserves_last_good_snapshot_on_failure(tmp_path):
     target = tmp_path / "share.sqlite"; _db(target, rows=2)
     candidate = tmp_path / "candidate.sqlite"; _db(candidate, complete=False)
