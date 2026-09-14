@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 APP = Path(__file__).resolve().parents[1] / "app.py"
@@ -39,3 +40,14 @@ def test_v4_trade_units_are_100m_usd():
 def test_v4_download_helper_is_not_monkey_patch():
     assert "def render_chart(" in TEXT
     assert "st.plotly_chart =" not in TEXT
+
+
+def test_every_chart_declares_its_data_source():
+    tree = ast.parse(TEXT)
+    calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "render_chart"
+    ]
+    assert calls
+    missing = [node.lineno for node in calls if not any(kw.arg == "source_key" for kw in node.keywords)]
+    assert missing == [], f"render_chart calls missing source_key at lines {missing}"
