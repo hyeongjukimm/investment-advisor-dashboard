@@ -10,6 +10,8 @@ from dashboard_utils import (
     sidebar_guide_sections,
     growth_calculation_guide,
     parse_date_text,
+    available_growth_windows,
+    growth_comparison_range,
 )
 
 
@@ -32,6 +34,17 @@ def test_parse_date_text_rejects_invalid_calendar_date():
         assert "날짜" in str(exc)
     else:
         raise AssertionError("invalid date must raise ValueError")
+
+
+def test_available_growth_windows_require_two_complete_windows():
+    assert available_growth_windows("2025-01-01", "2026-08-01") == [3, 6]
+    assert available_growth_windows("2020-01-01", "2026-08-01") == [3, 6, 12, 24]
+
+
+def test_growth_comparison_range_builds_current_and_previous_windows():
+    current_start, current_end, previous_start, previous_end = growth_comparison_range("2026-08-01", 12)
+    assert (current_start, current_end) == (pd.Timestamp("2025-09-01"), pd.Timestamp("2026-08-01"))
+    assert (previous_start, previous_end) == (pd.Timestamp("2024-09-01"), pd.Timestamp("2025-08-01"))
 
 
 def test_quick_month_range_three_years_is_36_months_inclusive():
@@ -97,9 +110,8 @@ def test_growth_calculation_guide_explains_amounts_modes_and_units():
     guide = growth_calculation_guide()
 
     assert "HS10별 월 수출액의 합" in guide
-    assert "첫 3개월 월평균" in guide
-    assert "마지막 3개월 월평균" in guide
-    assert "현재 선택기간 합계" in guide
-    assert "직전 동일 길이 기간 합계" in guide
+    assert "최근 3·6·12·24개월" in guide
+    assert "직전 동일 길이 기간" in guide
+    assert "상단 시작일" in guide
     assert "100,000,000" in guide
     assert "미매핑 HS10" in guide
