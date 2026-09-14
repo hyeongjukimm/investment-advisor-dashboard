@@ -338,11 +338,9 @@ if "period_start_input" not in st.session_state or "period_end_input" not in st.
 with st.container(border=True):
     r1, r2, r3, r4 = st.columns([1.0, 1.2, 1.2, 1.1])
     quick = r1.selectbox("빠른 기간", ["직접", "1Y", "3Y", "5Y", "10Y", "전체"], key="quick_range")
-    last = st.session_state.get("_quick_last")
-    if quick != "직접" and quick != last:
+    if quick != "직접":
         a, b = quick_month_range(available_end, quick, available_start)
         st.session_state.period_start_input = f"{a:%Y-%m-%d}"; st.session_state.period_end_input = f"{b:%Y-%m-%d}"
-    st.session_state["_quick_last"] = quick
     start_text = r2.text_input("기간 시작", key="period_start_input", help="260901, 20260901, 2026-09-01 형식 지원")
     end_text = r3.text_input("기간 종료", key="period_end_input", help="260901, 20260901, 2026-09-01 형식 지원")
     try:
@@ -537,10 +535,10 @@ def render_growth_leaders():
         selected_months = (period_end.to_period("M") - period_start.to_period("M")).n + 1
         previous_end = period_start - pd.DateOffset(months=1)
         previous_start = period_start - pd.DateOffset(months=selected_months)
-        st.caption(f"현재 비교: 선택기간 합계({period_start:%Y.%m}~{period_end:%Y.%m}) vs 직전 동일기간 합계({previous_start:%Y.%m}~{previous_end:%Y.%m})")
+        st.caption(f"현재 비교: 선택한 {selected_months}개월의 수출합계({period_start:%Y.%m}–{period_end:%Y.%m})와 바로 앞 {selected_months}개월의 수출합계({previous_start:%Y.%m}–{previous_end:%Y.%m})")
         growth_mode = "previous_period"
     else:
-        st.caption(f"현재 비교: 초반 3개월 월평균({period_start:%Y.%m}부터) vs 최근 3개월 월평균({period_end:%Y.%m}까지)")
+        st.caption(f"현재 비교: 초반 3개월 월평균({period_start:%Y.%m}부터)과 최근 3개월 월평균({period_end:%Y.%m}까지)")
         growth_mode = "endpoint"
     leaders=growth_leaders(source,entity,period_start,period_end,min_base_usd=min_base*1e8,mode=growth_mode)
     if leaders.empty: st.warning("조건을 만족하는 항목이 없습니다."); return
