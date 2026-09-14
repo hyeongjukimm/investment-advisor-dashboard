@@ -4,7 +4,34 @@ import sqlite3
 import pandas as pd
 
 from customs_pipeline import init_sqlite_db, upsert_dataframe
-from mart_builder import build_analysis_mart, mart_status
+from mart_builder import _trade_metrics, build_analysis_mart, mart_status
+
+
+def test_trade_metrics_do_not_treat_twelfth_sparse_observation_as_prior_year():
+    dates = list(pd.date_range("2010-01-01", "2010-12-01", freq="MS")) + [pd.Timestamp("2024-01-01")]
+    sparse = pd.DataFrame({
+        "date": dates,
+        "product": ["무선통신기기 부품"] * len(dates),
+        "export_usd": [100.0] * 12 + [10_000.0],
+    })
+
+    out = _trade_metrics(sparse, ["product"])
+    jan_2024 = out[out["date"] == pd.Timestamp("2024-01-01")].iloc[0]
+    feb_2011 = out[out["date"] == pd.Timestamp("2011-02-01")].iloc[0]
+
+    assert pd.isna(jan_2024["yoy_pct"])
+    assert pd.isna(feb_2011["export_usd"])
+
+
+def test_trade_metrics_leave_growth_blank_when_comparison_amount_is_zero():
+    frame = pd.DataFrame({
+        "date": [pd.Timestamp("2023-01-01"), pd.Timestamp("2024-01-01")],
+        "product": ["A", "A"],
+        "export_usd": [0.0, 100.0],
+    })
+    out = _trade_metrics(frame, ["product"])
+    yoy = out.loc[out["date"] == pd.Timestamp("2024-01-01"), "yoy_pct"].iloc[0]
+    assert pd.isna(yoy)
 
 
 def _fixture_taxonomy(path: Path):
