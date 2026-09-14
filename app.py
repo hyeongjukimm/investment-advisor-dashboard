@@ -12,7 +12,7 @@ import streamlit as st
 import urllib3
 
 from customs_pipeline import CustomsClient, refresh_customs_data
-from dashboard_utils import normalize_month_range, quick_month_range, format_100m_usd, industry_period_summary, sidebar_guide_sections
+from dashboard_utils import normalize_month_range, parse_date_text, quick_month_range, format_100m_usd, industry_period_summary, sidebar_guide_sections
 from data_lineage import page_methodology, source_caption
 from deployment_mode import allow_admin_controls, is_shared_mode
 from export_analytics import growth_leaders
@@ -333,7 +333,7 @@ page = st.radio("페이지", PAGES, horizontal=True, label_visibility="collapsed
 available_start, available_end = mart_bounds()
 if "period_start_input" not in st.session_state or "period_end_input" not in st.session_state:
     a, b = quick_month_range(available_end, "5Y", available_start)
-    st.session_state.period_start_input = a.date(); st.session_state.period_end_input = b.date()
+    st.session_state.period_start_input = f"{a:%Y-%m-%d}"; st.session_state.period_end_input = f"{b:%Y-%m-%d}"
 
 with st.container(border=True):
     r1, r2, r3, r4 = st.columns([1.0, 1.2, 1.2, 1.1])
@@ -341,11 +341,19 @@ with st.container(border=True):
     last = st.session_state.get("_quick_last")
     if quick != "직접" and quick != last:
         a, b = quick_month_range(available_end, quick, available_start)
-        st.session_state.period_start_input = a.date(); st.session_state.period_end_input = b.date()
+        st.session_state.period_start_input = f"{a:%Y-%m-%d}"; st.session_state.period_end_input = f"{b:%Y-%m-%d}"
     st.session_state["_quick_last"] = quick
-    start_date = r2.date_input("기간 시작", key="period_start_input", min_value=available_start.date(), max_value=available_end.date())
-    end_date = r3.date_input("기간 종료", key="period_end_input", min_value=available_start.date(), max_value=available_end.date())
-    period_start, period_end = normalize_month_range(start_date, end_date)
+    start_text = r2.text_input("기간 시작", key="period_start_input", help="260901, 20260901, 2026-09-01 형식 지원")
+    end_text = r3.text_input("기간 종료", key="period_end_input", help="260901, 20260901, 2026-09-01 형식 지원")
+    try:
+        start_date, end_date = parse_date_text(start_text), parse_date_text(end_text)
+        if start_date < available_start or end_date > available_end:
+            raise ValueError(f"조회 가능 기간은 {available_start:%Y-%m-%d}~{available_end:%Y-%m-%d}입니다.")
+        period_start, period_end = normalize_month_range(start_date, end_date)
+        st.session_state["_last_valid_period"] = (period_start, period_end)
+    except ValueError as exc:
+        st.error(str(exc))
+        period_start, period_end = st.session_state.get("_last_valid_period", (available_start, available_end))
     r4.metric("표시 기간", f"{period_start:%Y.%m}–{period_end:%Y.%m}")
 
 with st.expander("ⓘ 데이터·산출 기준", expanded=False):
@@ -511,7 +519,7 @@ def _leaders_source(level: str, top20: str | None, middle: str | None) -> tuple[
 def render_growth_leaders():
     st.session_state.setdefault("gl_top20",None); st.session_state.setdefault("gl_middle",None)
     mode_col,base_col=st.columns([1.7,1])
-    mode=mode_col.radio("성장 기준",["구간 초→말 3M","선택기간 합계 vs 직전 동일기간"],horizontal=True)
+    mode=mode_col.radio("성장 기준",["선택기간 합계 vs 직전 동일기간 합계","초반 3개월 평균 vs 최근 3개월 평균"],horizontal=True)
     min_base=base_col.number_input("최소 비교규모 (억달러)",min_value=0.0,value=1.0,step=1.0)
     top20=st.session_state.gl_top20; middle=st.session_state.gl_middle
     if not top20: level="Top20"
@@ -525,7 +533,16 @@ def render_growth_leaders():
     crumb="Top20"+(f" → {top20}" if top20 else "")+(f" → {middle}" if middle else "")
     b3.markdown(f"**Top20 → 리서치중분류 → 대표품목** &nbsp; | &nbsp; 현재: {crumb}")
     source,entity,label=_leaders_source(level,top20,middle)
-    leaders=growth_leaders(source,entity,period_start,period_end,min_base_usd=min_base*1e8,mode="endpoint" if mode.startswith("구간") else "previous_period")
+    if mode.startswith("선택기간"):
+        selected_months = (period_end.to_period("M") - period_start.to_period("M")).n + 1
+        previous_end = period_start - pd.DateOffset(months=1)
+        previous_start = period_start - pd.DateOffset(months=selected_months)
+        st.caption(f"현재 비교: 선택기간 합계({period_start:%Y.%m}~{period_end:%Y.%m}) vs 직전 동일기간 합계({previous_start:%Y.%m}~{previous_end:%Y.%m})")
+        growth_mode = "previous_period"
+    else:
+        st.caption(f"현재 비교: 초반 3개월 월평균({period_start:%Y.%m}부터) vs 최근 3개월 월평균({period_end:%Y.%m}까지)")
+        growth_mode = "endpoint"
+    leaders=growth_leaders(source,entity,period_start,period_end,min_base_usd=min_base*1e8,mode=growth_mode)
     if leaders.empty: st.warning("조건을 만족하는 항목이 없습니다."); return
     show=leaders.copy(); show["기간수출_억달러"]=show["period_export_usd"]/1e8; show["증가액_억달러"]=show["absolute_increase_usd"]/1e8
     k1,k2,k3,k4=st.columns(4); k1.metric("성장률 1위",f"{show.iloc[0]['entity']} · {show.iloc[0]['growth_pct']:+.1f}%"); inc=show.sort_values("absolute_increase_usd",ascending=False).iloc[0]; k2.metric("증가액 1위",f"{inc['entity']} · {inc['증가액_억달러']:+.1f}억달러"); con=show.sort_values("contribution_pct",ascending=False).iloc[0]; k3.metric("기여도 1위",f"{con['entity']} · {con['contribution_pct']:+.1f}%"); k4.metric("성장 항목",f"{int((show['growth_pct']>0).sum())}/{len(show)}")
