@@ -57,7 +57,20 @@ def test_industry_period_summary_uses_selected_start_and_end():
 def test_sidebar_guide_explains_navigation_mapping_and_updates():
     sections = sidebar_guide_sections()
 
-    assert list(sections) == ["화면 활용", "지표 해석", "분류·매핑 확인", "데이터·웹 갱신"]
+    assert list(sections) == [
+        "처음 보는 분을 위한 빠른 시작",
+        "종합 현황",
+        "산업 스크리너",
+        "산업 상세",
+        "수출 성장",
+        "품목 모니터",
+        "종목 후보",
+        "최근 수출",
+        "지표·점수 해석",
+        "분류·매핑 확인",
+        "데이터 갱신·웹 반영",
+        "데이터 한계와 주의사항",
+    ]
     assert "HS10 → 리서치 중분류 → 대표품목 → 산업부 Top20" in sections["분류·매핑 확인"]
     assert "데이터 점검" in sections["분류·매핑 확인"]
-    assert "Commit to main → Push origin" in sections["데이터·웹 갱신"]
+    assert "Commit to main → Push origin" in sections["데이터 갱신·웹 반영"]
