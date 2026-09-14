@@ -104,6 +104,26 @@ def quick_month_range(latest: Any, preset: str, available_start: Any) -> tuple[p
     return max(start, floor), end
 
 
+def available_growth_windows(available_start: Any, comparison_end: Any) -> list[int]:
+    """Return comparison windows with enough history for current and prior periods."""
+    start = _month_start(available_start)
+    end = _month_start(comparison_end)
+    available_months = (end.year - start.year) * 12 + end.month - start.month + 1
+    return [months for months in (3, 6, 12, 24) if available_months >= months * 2]
+
+
+def growth_comparison_range(comparison_end: Any, months: int) -> tuple[pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp]:
+    """Return inclusive current and immediately preceding comparison windows."""
+    end = _month_start(comparison_end)
+    months = int(months)
+    if months < 1:
+        raise ValueError("comparison months must be positive")
+    current_start = end - pd.DateOffset(months=months - 1)
+    previous_end = current_start - pd.DateOffset(months=1)
+    previous_start = previous_end - pd.DateOffset(months=months - 1)
+    return current_start, end, previous_start, previous_end
+
+
 def filter_month_range(df: pd.DataFrame, start: Any, end: Any, date_col: str = "date") -> pd.DataFrame:
     """Filter a frame to an inclusive month range without mutating the source."""
     if df.empty or date_col not in df.columns:
