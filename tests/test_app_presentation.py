@@ -13,9 +13,18 @@ def test_v4_is_mart_first_and_lazy_pages():
 
 
 def test_v4_has_calendar_controls_and_quick_ranges():
-    assert ".date_input(" in TEXT
+    assert 'text_input("기간 시작"' in TEXT
+    assert 'text_input("기간 종료"' in TEXT
+    assert "parse_date_text" in TEXT
     assert '"1Y", "3Y", "5Y", "10Y", "전체"' in TEXT
     assert "normalize_month_range" in TEXT
+
+
+def test_growth_mode_defaults_to_previous_equal_period_and_explains_comparison():
+    preferred = "선택기간 합계 vs 직전 동일기간 합계"
+    alternative = "초반 3개월 평균 vs 최근 3개월 평균"
+    assert TEXT.index(preferred) < TEXT.index(alternative)
+    assert "현재 비교:" in TEXT
 
 
 def test_navigation_and_flash_page_use_korean_labels_and_canonical_schema():
