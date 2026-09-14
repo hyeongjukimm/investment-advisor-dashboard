@@ -65,6 +65,13 @@ def _trade_metrics(df: pd.DataFrame, group_cols: list[str]) -> pd.DataFrame:
         if c not in x.columns:
             x[c] = 0.0
         x[c] = pd.to_numeric(x[c], errors="coerce").fillna(0.0)
+    calendar = pd.DataFrame({"date": pd.date_range(x["date"].min(), x["date"].max(), freq="MS")})
+    if group_cols:
+        groups = x[group_cols].drop_duplicates()
+        grid = groups.merge(calendar, how="cross")
+        x = grid.merge(x, on=group_cols + ["date"], how="left")
+    else:
+        x = calendar.merge(x, on="date", how="left")
     x = x.sort_values(group_cols + ["date"]).reset_index(drop=True)
     if group_cols:
         g = x.groupby(group_cols, dropna=False)
@@ -77,6 +84,7 @@ def _trade_metrics(df: pd.DataFrame, group_cols: list[str]) -> pd.DataFrame:
         x["yoy_pct"] = x["export_usd"].pct_change(12, fill_method=None) * 100
         x["year"] = x["date"].dt.year
         x["ytd_usd"] = x.groupby("year")["export_usd"].cumsum()
+    x[["mom_pct", "yoy_pct"]] = x[["mom_pct", "yoy_pct"]].replace([np.inf, -np.inf], np.nan)
     x["unit_price_usd_per_kg"] = x["export_usd"].div(x["export_weight"].replace(0, np.nan))
     return x
 
@@ -118,7 +126,7 @@ def _rollup_trade(df: pd.DataFrame, group_cols: list[str]) -> pd.DataFrame:
     base_cols = ["export_usd", "import_usd", "export_weight", "import_weight", "balance_usd"]
     grouped = (
         df.groupby(["date"] + group_cols, as_index=False, dropna=False)[base_cols]
-        .sum()
+        .sum(min_count=1)
     )
     return _trade_metrics(grouped, group_cols)
 
