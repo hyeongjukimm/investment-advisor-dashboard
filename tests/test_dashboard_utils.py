@@ -9,6 +9,7 @@ from dashboard_utils import (
     industry_period_summary,
     sidebar_guide_sections,
     growth_calculation_guide,
+    parse_date_text,
 )
 
 
@@ -16,6 +17,21 @@ def test_normalize_month_range_orders_and_month_normalizes():
     start, end = normalize_month_range("2026-08-28", "2025-01-15")
     assert start == pd.Timestamp("2025-01-01")
     assert end == pd.Timestamp("2026-08-01")
+
+
+def test_parse_date_text_accepts_compact_and_iso_formats():
+    assert parse_date_text("260901") == pd.Timestamp("2026-09-01")
+    assert parse_date_text("20260901") == pd.Timestamp("2026-09-01")
+    assert parse_date_text("2026-09-01") == pd.Timestamp("2026-09-01")
+
+
+def test_parse_date_text_rejects_invalid_calendar_date():
+    try:
+        parse_date_text("260231")
+    except ValueError as exc:
+        assert "날짜" in str(exc)
+    else:
+        raise AssertionError("invalid date must raise ValueError")
 
 
 def test_quick_month_range_three_years_is_36_months_inclusive():
