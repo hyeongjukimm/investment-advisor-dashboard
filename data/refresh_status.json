@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "started_at": "2026-09-19T01:19:38+00:00",
+  "started_at": "2026-09-20T01:19:48+00:00",
   "kosis": "224,232행 갱신",
   "customs": "2026-08 갱신",
   "warnings": [],
@@ -17,7 +17,7 @@
     "ok": true,
     "path": "/home/runner/work/investment-advisor-dashboard/investment-advisor-dashboard/data/share_snapshot.sqlite",
     "rows": 7600,
-    "built_at": "2026-09-19T01:28:46",
+    "built_at": "2026-09-20T01:28:25",
     "latest_export_month": "2026-08",
     "earliest_export_month": "1995-01",
     "latest_kosis_month": "2026-07",
@@ -26,5 +26,5 @@
     "taxonomy_product": "439",
     "promoted_to": "/home/runner/work/investment-advisor-dashboard/investment-advisor-dashboard/data/share_snapshot.sqlite"
   },
-  "finished_at": "2026-09-19T01:28:46+00:00"
+  "finished_at": "2026-09-20T01:28:26+00:00"
 }
