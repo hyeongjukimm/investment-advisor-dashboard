@@ -486,6 +486,8 @@ def mart_status(path: str | Path) -> dict:
                 return {"ready": False, "path": str(p)}
             meta = dict(con.execute("SELECT key,value FROM mart_metadata").fetchall())
             rows = con.execute("SELECT COUNT(*) FROM mart_export_top20_monthly").fetchone()[0]
+            if rows <= 0:
+                return {"ready": False, "path": str(p), "rows": rows, "error": "Top20 mart is empty"}
         return {"ready": True, "path": str(p), "rows": rows, **meta}
     except Exception as exc:
         return {"ready": False, "path": str(p), "error": str(exc)}

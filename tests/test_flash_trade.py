@@ -44,3 +44,13 @@ def test_normalize_flash_schema_accepts_legacy_plural_and_app_names():
     assert out.loc[0, "checkpoint_day"] == 10
     assert out.loc[0, "export_usd_m"] == 34973
     assert out.loc[0, "export_yoy_pct"] == 82.6
+
+
+def test_normalize_flash_schema_coalesces_legacy_values_when_canonical_is_blank():
+    mixed = pd.DataFrame([{
+        "month": "2026-09", "checkpoint_day": pd.NA, "checkpoint_days": 20,
+        "export_yoy_pct": pd.NA, "yoy_pct": 12.3,
+    }])
+    out = normalize_flash_schema(mixed)
+    assert out.loc[0, "checkpoint_day"] == 20
+    assert out.loc[0, "export_yoy_pct"] == 12.3

@@ -12,7 +12,7 @@ import requests
 from customs_pipeline import CustomsClient, refresh_customs_data
 from flash_trade import refresh_flash_cache
 from kosis_cache import write_kosis_cache
-from kosis_client import fetch_kosis_history_payload
+from kosis_client import KosisApiError, fetch_kosis_history_payload
 from mart_builder import build_analysis_mart, make_share_snapshot
 from validate_snapshot import promote_snapshot
 
@@ -80,10 +80,16 @@ def run_refresh(base_dir: str | Path, *, environ=None) -> dict:
             if not frame.empty:
                 write_kosis_cache(frame, data / "kosis_cycle_cache.csv")
                 result["kosis"] = f"{len(frame):,}행 갱신"
-        except requests.RequestException as exc:
+        except (requests.RequestException, KosisApiError) as exc:
             error_name = type(exc).__name__
             result["kosis"] = f"기존 캐시 유지 ({error_name})"
-            result["warnings"].append(f"KOSIS 네트워크 오류: {error_name}")
+            detail = str(exc).strip()
+            api_detail = str(getattr(exc, "err_msg", "") or "").strip()
+            if api_detail and api_detail not in detail:
+                detail = f"{detail} · {api_detail}" if detail else api_detail
+            result["warnings"].append(
+                f"KOSIS 갱신 오류: {error_name}" + (f" · {detail}" if detail else "")
+            )
 
     if customs_key:
         mapping = pd.read_csv(data / "motir20_hsk_mti_mapping_2026.csv", dtype=str).fillna("")

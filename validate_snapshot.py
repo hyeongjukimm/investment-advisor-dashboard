@@ -7,7 +7,13 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
-REQUIRED_TABLES = {"mart_export_top20_monthly", "dim_product_taxonomy", "mart_metadata"}
+REQUIRED_TABLES = {
+    "mart_export_top20_monthly",
+    "mart_export_middle_monthly",
+    "mart_export_product_monthly",
+    "dim_product_taxonomy",
+    "mart_metadata",
+}
 
 
 class SnapshotValidationError(RuntimeError):
@@ -30,6 +36,20 @@ def validate_snapshot(path: str | Path) -> dict:
             rows = int(con.execute("SELECT COUNT(*) FROM mart_export_top20_monthly").fetchone()[0])
             if rows <= 0:
                 raise SnapshotValidationError("Top20 월별 데이터가 비어 있습니다.")
+            middle_rows = int(con.execute("SELECT COUNT(*) FROM mart_export_middle_monthly").fetchone()[0])
+            product_rows = int(con.execute("SELECT COUNT(*) FROM mart_export_product_monthly").fetchone()[0])
+            if middle_rows <= 0 or product_rows <= 0:
+                raise SnapshotValidationError(
+                    f"드릴다운 데이터가 비어 있습니다: 중분류 {middle_rows:,}행, 대표품목 {product_rows:,}행"
+                )
+            taxonomy_top20 = int(con.execute(
+                "SELECT COUNT(DISTINCT item20) FROM dim_product_taxonomy "
+                "WHERE item20 IS NOT NULL AND TRIM(item20) <> ''"
+            ).fetchone()[0])
+            if taxonomy_top20 != 20:
+                raise SnapshotValidationError(
+                    f"HS10→MTI20 택소노미의 Top20 분류 수가 20이 아닙니다: {taxonomy_top20}"
+                )
             observed = [date.fromisoformat(row[0][:10]) for row in con.execute(
                 "SELECT DISTINCT date FROM mart_export_top20_monthly ORDER BY date"
             )]
@@ -46,7 +66,15 @@ def validate_snapshot(path: str | Path) -> dict:
             metadata = dict(con.execute("SELECT key,value FROM mart_metadata").fetchall())
     except sqlite3.Error as exc:
         raise SnapshotValidationError(f"SQLite 읽기 실패: {exc}") from exc
-    return {"ok": True, "path": str(db), "rows": rows, **metadata}
+    return {
+        "ok": True,
+        "path": str(db),
+        "rows": rows,
+        "middle_rows": middle_rows,
+        "product_rows": product_rows,
+        "taxonomy_top20": taxonomy_top20,
+        **metadata,
+    }
 
 
 def promote_snapshot(candidate: str | Path, target: str | Path) -> dict:

@@ -19,8 +19,11 @@ def normalize_flash_schema(df: pd.DataFrame) -> pd.DataFrame:
         "yoy_pct": "export_yoy_pct",
     }
     for old, new in aliases.items():
-        if new not in out.columns and old in out.columns:
-            out[new] = out[old]
+        if old in out.columns:
+            if new not in out.columns:
+                out[new] = out[old]
+            else:
+                out[new] = out[new].where(out[new].notna(), out[old])
     if "export_usd_m" not in out.columns and "export_usd" in out.columns:
         out["export_usd_m"] = pd.to_numeric(out["export_usd"], errors="coerce") / 1_000_000
     required = ["month", "checkpoint_day", "export_usd_m", "import_usd_m",
@@ -99,7 +102,10 @@ def refresh_flash_cache(cache_path: str | Path, timeout: int = 20, verify_ssl: b
         row = parse_customs_homepage_flash(r.text, year=datetime.now().year)
         row["fetched_at"] = datetime.now().isoformat(timespec="seconds")
         existing = pd.read_csv(cache_path) if cache_path.exists() else pd.DataFrame()
-        out = pd.concat([existing, pd.DataFrame([row])], ignore_index=True, sort=False)
+        existing = normalize_flash_schema(existing)
+        out = normalize_flash_schema(
+            pd.concat([existing, pd.DataFrame([row])], ignore_index=True, sort=False)
+        )
         out = out.drop_duplicates(["month","checkpoint_day"], keep="last")
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         out.to_csv(cache_path, index=False)
