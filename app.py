@@ -337,7 +337,7 @@ if "period_start_input" not in st.session_state or "period_end_input" not in st.
     a, b = quick_month_range(available_end, "5Y", available_start)
     st.session_state.period_start_input = f"{a:%Y-%m-%d}"; st.session_state.period_end_input = f"{b:%Y-%m-%d}"
 
-if page != "수출 성장":
+if page not in ("수출 성장", "최근 수출"):
     with st.container(border=True):
         r1, r2, r3, r4 = st.columns([1.0, 1.2, 1.2, 1.1])
         quick = r1.selectbox("빠른 기간", ["직접", "1Y", "3Y", "5Y", "10Y", "전체"], key="quick_range")
@@ -348,14 +348,27 @@ if page != "수출 성장":
         end_text = r3.text_input("기간 종료", key="period_end_input", help="260901, 20260901, 2026-09-01 형식 지원")
         try:
             start_date, end_date = parse_date_text(start_text), parse_date_text(end_text)
-            if start_date < available_start or end_date > available_end:
-                raise ValueError(f"조회 가능 기간은 {available_start:%Y-%m-%d}~{available_end:%Y-%m-%d}입니다.")
+            if start_date < available_start or start_date > available_end:
+                raise ValueError(f"월간 품목 조회 가능 기간은 {available_start:%Y-%m-%d}~{available_end:%Y-%m-%d}입니다.")
+            if end_date > available_end:
+                st.info(f"월간 HS10 품목 데이터는 {available_end:%Y-%m}까지입니다. 월간 차트는 해당 월까지 표시하며, 9월 잠정 총수출은 ‘최근 수출’에서 확인하세요.")
+                end_date = available_end
             period_start, period_end = normalize_month_range(start_date, end_date)
             st.session_state["_last_valid_period"] = (period_start, period_end)
         except ValueError as exc:
             st.error(str(exc))
             period_start, period_end = st.session_state.get("_last_valid_period", (available_start, available_end))
         r4.metric("표시 기간", f"{period_start:%Y.%m}–{period_end:%Y.%m}")
+
+if page == "품목 모니터":
+    _flash = load_flash_snapshots(FLASH_SEED, FLASH_CACHE)
+    _flash = _flash.dropna(subset=["export_usd_m", "checkpoint_day"])
+    if not _flash.empty:
+        _recent = _flash.sort_values(["month", "checkpoint_day"]).iloc[-1]
+        _period = f"{_recent['month']} 1~{int(_recent['checkpoint_day'])}일"
+        st.info(f"최신 관세청 잠정 총수출 · {_period}: {usd100m(_recent['export_usd_m'] * 1_000_000)} "
+                f"(전년 동기 대비 {pct(_recent['export_yoy_pct'])}). 상세 비교는 ‘최근 수출’ 탭에서 확인하세요. "
+                "아래 품목 차트는 월간 HS10 확정 데이터 기준입니다. 잠정 총수출을 품목별 실적으로 배분하지 않습니다.")
 
 with st.expander("ⓘ 데이터·산출 기준", expanded=False):
     st.markdown(page_methodology(page))
@@ -682,7 +695,8 @@ def render_export_flash():
     months=sorted(flash["month"].dropna().astype(str).unique()); month=st.selectbox("월",months,index=len(months)-1,key="flash_month")
     current=flash[flash["month"].astype(str)==month].copy(); current["checkpoint_day"]=pd.to_numeric(current["checkpoint_day"],errors="coerce"); current=current.dropna(subset=["checkpoint_day","export_usd_m"]).sort_values("checkpoint_day")
     if current.empty: st.info("선택한 월의 수출 속보 데이터가 없습니다."); return
-    latest=current.iloc[-1]; status_label="확정" if int(latest["checkpoint_day"])>=28 or str(latest.get("status","")).strip()=="확정" else "집계중"
+    latest=current.iloc[-1]; status_label=str(latest.get("status") or "잠정").strip()
+    st.caption("10일·20일·월말 수치는 관세청 잠정 총수출입니다. 월간 HS10 품목 데이터와 집계 주기·분류가 달라 직접 연결하지 않습니다. 이 자료에는 DRAM 세부 수출액이 없습니다.")
     k1,k2,k3,k4=st.columns(4); k1.metric("누적 수출",usd100m(latest["export_usd_m"]*1_000_000)); k2.metric("전년 대비",pct(latest.get("export_yoy_pct"))); k3.metric("누적 수입",usd100m(latest.get("import_usd_m")*1_000_000)); k4.metric("상태",f"{status_label} · 1~{int(latest['checkpoint_day'])}일")
     comp=flash_comparison_frame(flash,month,int(latest["checkpoint_day"])); c1,c2=st.columns(2)
     with c1:
