@@ -58,6 +58,13 @@ SOURCE_CATALOG = {
         "url": "https://www.motie.go.kr/kor/article/ATCL3f49a5a8c/list",
         "processing": "동일 체크포인트 기준 전년·전월·5년 평균 비교",
     },
+    "recent_monthly_provisional": {
+        "institution": "관세청", "dataset": "월간 수출 확정액·주요품목/국가 잠정치",
+        "operation": "getItemtradeList · getPrlstMmUtPrviExpAcrs · getCntyMmUtPrviExpAcrs",
+        "field": "expDlr · itemUsdAmt00~10 · priodDt · priodMon",
+        "url": "https://www.data.go.kr/data/15157908/openapi.do",
+        "processing": "전체 과거 월=월간 HS 통계; 품목/국가 과거 월=월말 잠정; 당월=10일 누적+11~20일 증가분; 성장률은 각각 동일 기간 비교",
+    },
     "provisional_product": {
         "institution": "관세청", "dataset": "수출 주요품목별 10일 단위 잠정치 통계",
         "operation": "getPrlstMmUtPrviExpAcrs", "field": "itemUsdAmt00~10 · priodDt · priodMon",
@@ -124,7 +131,7 @@ PAGE_METHODOLOGY = {
     "수출 성장": f"**사용 데이터** · 관세청 품목별 수출입실적(GW) `getItemtradeList/expDlr`와 2026 고정 택소노미\n\n**산출 방식** · {_COMMON_EXPORT}\n\n{{growth}}",
     "품목 모니터": f"**사용 데이터** · 관세청 `getItemtradeList/expDlr`, 품목별 국가별 `getNitemtradeList/expDlr·expWgt`\n\n**산출 방식** · {_COMMON_EXPORT} 전세계가 기본값입니다. 추적국의 기간 합계 상위 최대 5개국을 누적 막대로 표시하고 Others=전세계−표시국가 합계입니다. 국가 자료가 없는 기간은 세계 합계로 표시합니다. 단가는 수출신고 미화금액÷순중량(USD/kg)입니다.",
     "종목 후보": "**사용 데이터** · 대표품목 택소노미와 내부 company_exposure.csv\n\n**산출 방식** · 대표품목 ID 또는 품목명으로 기업 후보를 연결합니다. 통관액은 기업 매출이 아니므로 공시 검증이 필요합니다.",
-    "최근 수출": "**사용 데이터** · 관세청 수출 주요품목별·주요국가별 10일 단위 잠정치 API (`getPrlstMmUtPrviExpAcrs`, `getCntyMmUtPrviExpAcrs`)\n\n**산출 방식** · 원자료 천 달러를 USD로 변환합니다. 1~10일·1~20일·월말을 각각 분리하고 정확히 전년 같은 달·전월의 동일 집계 기준과 비교합니다. 주요품목 합계는 API의 10개 품목 합계이며 기존 Top20과 다릅니다. 국가 데이터는 한국 전체 수출의 목적지별 금액이며 품목×국가 잠정치는 제공하지 않습니다. 중량·단가도 제공되지 않습니다. 수집 시각과 수정 이력을 저장하며 누락값을 0으로 채우지 않습니다.",
+    "최근 수출": "**사용 데이터** · 관세청 월간 HS 통계와 주요품목·국가 잠정 API\n\n**산출 방식** · **표시 기간** · 과거 월은 월 전체 금액, 당월은 잠정 누적액을 표시합니다. 전체 과거 월은 월간 HS 통계 확정액이고, 주요품목·국가 과거 월은 API 월말 잠정액입니다. 잠정 API의 확정 여부는 제공되지 않습니다.\n\n**당월 누적** · 1~10일 누적 위에 11~20일 증가분을 쌓아 전체 높이가 1~20일 누적액이 되도록 합니다. 중간 발표가 없거나 수정으로 누적액이 감소하면 최신 합계를 단일 막대로 표시합니다. 당월 자료가 없으면 최신 확정월까지만 표시합니다.\n\n**성장률** · 과거 월은 월 전체 YoY/MoM, 당월 마름모는 전년/전월 동일 누적기간 대비입니다. 품목별 차트는 표시 품목에서 선택한 항목만 나옵니다. 세부 품목·중량·단가 및 품목×국가 잠정치는 제공되지 않습니다.",
     "데이터 점검": "**사용 데이터** · 관세청 `getItemtradeList/expDlr` 전체 HS10과 택소노미 매핑 결과\n\n**산출 방식** · Coverage=매핑 HS10 수출액÷전체 HS10 수출액×100, Gap=미매핑 HS10 수출액입니다.",
 }
 

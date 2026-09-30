@@ -49,3 +49,36 @@ def provisional_summary_figure(total: pd.DataFrame, major: pd.DataFrame, product
     fig.update_layout(barmode='relative', height=500, margin=dict(l=12,r=12,t=55,b=120),
         legend=dict(orientation='h',yanchor='top',y=-.22,x=0))
     return fig
+
+
+def recent_export_figure(series, *, title, growth='yoy_pct'):
+    fig=make_subplots(specs=[[{'secondary_y':True}]])
+    stages=[('amount_month','월 전체','#9ca7b6'),('amount_10','1~10일 누적','#278dc8'),
+            ('amount_20_increment','11~20일 증가분','#80c9e9'),('amount_end_increment','21일~월말 증가분','#b3dde9'),
+            ('amount_unsplit','최신 누적(중간 발표 미수집)','#278dc8')]
+    for i,(name,frame) in enumerate(series):
+        if frame.empty:continue
+        custom=frame[['period_label','export_usd','source_kind']].copy()
+        custom['export_usd']=custom.export_usd/1e8
+        for column,label,color in stages:
+            if not frame[column].notna().any():continue
+            fig.add_trace(go.Bar(x=frame.date,y=frame[column]/1e8,name=f'{name} · {label}',
+                marker_color=color,offsetgroup=name,customdata=custom.to_numpy(),
+                hovertemplate='%{customdata[0]}<br>%{fullData.name}: %{y:.2f}억 달러<br>기간 합계: %{customdata[1]:.2f}억 달러<br>%{customdata[2]}<extra></extra>'),secondary_y=False)
+        history=frame[~frame.is_current]
+        color=['#2996de','#65bb90'][i%2]
+        label='YoY' if growth=='yoy_pct' else 'MoM'
+        fig.add_trace(go.Scatter(x=history.date,y=history[growth],name=f'{name} 월 전체 {label}',mode='lines',
+            line=dict(color=color,width=2.5),customdata=history[['period_label']].to_numpy(),
+            hovertemplate='%{customdata[0]}<br>'+label+': %{y:.1f}%<extra></extra>'),secondary_y=True)
+        current=frame[frame.is_current]
+        if not current.empty:
+            fig.add_trace(go.Scatter(x=current.date,y=current[growth],name=f'{name} 잠정 {label}',mode='markers',
+                marker=dict(color=color,size=9,symbol='diamond'),customdata=current[['period_label']].to_numpy(),
+                hovertemplate='%{customdata[0]}<br>동일 누적기간 '+label+': %{y:.1f}%<extra></extra>'),secondary_y=True)
+    fig.update_layout(title=title,height=450,barmode='relative',hovermode='x unified',
+        margin=dict(l=12,r=12,t=65,b=100),legend=dict(orientation='h',y=-.22,yanchor='top',x=0))
+    fig.update_xaxes(tickformat='%Y.%m',hoverformat='%Y년 %m월')
+    fig.update_yaxes(title_text='수출금액 (억달러)',secondary_y=False,rangemode='tozero')
+    fig.update_yaxes(title_text='성장률 (%)',secondary_y=True,showgrid=False)
+    return fig
