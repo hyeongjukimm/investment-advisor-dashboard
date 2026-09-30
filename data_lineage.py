@@ -61,19 +61,19 @@ SOURCE_CATALOG = {
     "recent_monthly_provisional": {
         "institution": "관세청", "dataset": "월간 수출 확정액·주요품목/국가 잠정치",
         "operation": "getItemtradeList · getPrlstMmUtPrviExpAcrs · getCntyMmUtPrviExpAcrs",
-        "field": "expDlr · itemUsdAmt00~10 · priodDt · priodMon",
+        "field": "expDlr · itemUsdAmt00–10 · priodDt · priodMon",
         "url": "https://www.data.go.kr/data/15157908/openapi.do",
-        "processing": "전체 과거 월=월간 HS 통계; 품목/국가 과거 월=월말 잠정; 당월=10일 누적+11~20일 증가분; 성장률은 각각 동일 기간 비교",
+        "processing": "전체 과거 월=월간 HS 통계; 품목/국가 과거 월=월말 잠정; 당월=10일 누적+11–20일 증가분; 성장률은 각각 동일 기간 비교",
     },
     "provisional_product": {
         "institution": "관세청", "dataset": "수출 주요품목별 10일 단위 잠정치 통계",
-        "operation": "getPrlstMmUtPrviExpAcrs", "field": "itemUsdAmt00~10 · priodDt · priodMon",
+        "operation": "getPrlstMmUtPrviExpAcrs", "field": "itemUsdAmt00–10 · priodDt · priodMon",
         "url": "https://www.data.go.kr/data/15157908/openapi.do",
         "processing": "천 달러 → USD; 동일 10일·20일·월말 기준 전년·전월 비교; 주요품목 누적은 10개 합계",
     },
     "provisional_country": {
         "institution": "관세청", "dataset": "수출 주요국가별 10일 단위 잠정치 통계",
-        "operation": "getCntyMmUtPrviExpAcrs", "field": "itemUsdAmt00~10 · priodDt · priodMon",
+        "operation": "getCntyMmUtPrviExpAcrs", "field": "itemUsdAmt00–10 · priodDt · priodMon",
         "url": "https://www.data.go.kr/data/15157941/openapi.do",
         "processing": "천 달러 → USD; 전체 수출 목적지별 금액; 품목×국가 교차통계 아님",
     },
