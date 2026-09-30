@@ -49,7 +49,8 @@ def parse_provisional_xml(payload: str | bytes, dimension: str) -> pd.DataFrame:
     if count > len(rows):
         raise ValueError('API 응답이 잘렸습니다. 조회 기간을 줄이세요.')
     names = PRODUCTS if dimension == 'product' else COUNTRIES
-    stems = ['itemUsdAmt'] if dimension == 'product' else ['cntyUsdAmt', 'natUsdAmt', 'nationUsdAmt']
+    # Both official services return itemUsdAmt00..10; labels depend on service.
+    stems = ['itemUsdAmt']
     now = datetime.now(timezone.utc).isoformat(timespec='microseconds')
     out = []
     for item in rows:
