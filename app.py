@@ -25,6 +25,9 @@ from kosis_cache import read_kosis_cache, write_kosis_cache
 from kosis_client import fetch_kosis_history_payload
 from mart_builder import build_analysis_mart, mart_status
 from provisional_trade import PRODUCTS, COUNTRIES, TOP20_LINKS, load_snapshots, checkpoint_history, major_product_total, country_composition
+import importlib
+# Cloud reruns can retain chart modules from the previous deployment.
+importlib.reload(importlib.import_module('trade_charts'))
 from trade_charts import amount_growth_figure, provisional_summary_figure
 
 BASE_DIR = Path(__file__).resolve().parent
