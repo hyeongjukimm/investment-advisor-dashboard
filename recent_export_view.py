@@ -7,7 +7,9 @@ def recent_series(snapshots, dimension, category, *, monthly=None, confirmed_thr
     limit=pd.Timestamp(confirmed_through).to_period('M').to_timestamp()
     current=pd.Timestamp(current_month).to_period('M').to_timestamp()
     historic=checkpoint_history(snapshots,dimension,'month_end',category)
-    historic=historic[historic.date<=limit].copy()
+    # A completed month's provisional full total must remain visible while
+    # the monthly final mart still lags behind (e.g. September on October 1).
+    historic=historic[historic.date<=max(limit,current-pd.DateOffset(months=1))].copy()
     historic['status']='월말 잠정'
     historic['source_kind']='잠정 API 월말'
     if monthly is not None and not monthly.empty:

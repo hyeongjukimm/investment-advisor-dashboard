@@ -762,7 +762,7 @@ def render_export_flash():
     download=pd.concat([total.assign(category='전체'),major.assign(category='주요 10개 품목 합계')],ignore_index=True)
     render_chart(fig,source_key='recent_monthly_provisional',csv_df=download,csv_name='recent_total_major_products',key='prov_summary')
     st.caption('당월: 1–10일 누적 + 11–20일 증가분 = 1–20일 누적액. 당월 성장률(마름모)은 전년·전월 동일 누적기간 대비이며 월 전체 성장률과 분리 표시합니다.')
-    st.caption('전체 수출의 과거 월은 월간 HS 통계 확정액입니다. 주요품목·국가의 과거 월은 잠정 API 월말 합계이며, 확정 여부가 제공되지 않아 월말 잠정으로 표시합니다. 주요 10개 품목 합계는 기존 Top20 합계와 분류가 다릅니다.')
+    st.caption('전체 수출의 과거 월은 월간 HS 통계 확정액을 우선 사용하며, 확정액이 아직 없는 월은 잠정 API 월말 합계를 월말 잠정으로 표시합니다. 주요품목·국가의 과거 월도 확정 여부가 제공되지 않아 월말 잠정으로 표시합니다. 주요 10개 품목 합계는 기존 Top20 합계와 분류가 다릅니다.')
     st.subheader('품목별 잠정 수출')
     selected=st.multiselect('표시 품목',PRODUCTS[1:],default=[PRODUCTS[1]],key='prov_selected_products')
     if not selected:st.info('표시할 품목을 선택하세요.')

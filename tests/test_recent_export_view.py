@@ -66,3 +66,27 @@ def test_downward_revision_uses_latest_total_without_negative_stack():
     out=recent_series(data,'product','전체',confirmed_through='2026-08-01',current_month='2026-09-01')
     assert out.iloc[-1].amount_unsplit==20
     assert pd.isna(out.iloc[-1].amount_10)
+
+
+def test_october_keeps_september_month_end_before_monthly_final_arrives():
+    data=observations()
+    end=data.iloc[[1]].copy()
+    end['checkpoint']='month_end';end['checkpoint_day']=30;end['export_usd']=120.
+    data=pd.concat([data,end],ignore_index=True)
+    monthly=pd.DataFrame({'date':pd.to_datetime(['2026-08-01']),'export_usd':[1000.]})
+    out=recent_series(data,'product','전체',monthly=monthly,confirmed_through='2026-08-01',current_month='2026-10-01')
+    assert out.export_usd.tolist()==[1000.,120.]
+    assert out.iloc[-1].status=='월말 잠정'
+    assert out.iloc[-1].period_label=='2026.09 · 월 전체 월말 잠정'
+    assert out.iloc[-1].amount_month==120.
+    assert not out.iloc[-1].is_current
+
+
+def test_monthly_final_replaces_september_provisional_after_rollover():
+    data=observations()
+    end=data.iloc[[1]].copy()
+    end['checkpoint']='month_end';end['checkpoint_day']=30;end['export_usd']=120.
+    monthly=pd.DataFrame({'date':pd.to_datetime(['2026-08-01','2026-09-01']),'export_usd':[1000.,125.]})
+    out=recent_series(pd.concat([data,end]),'product','전체',monthly=monthly,confirmed_through='2026-09-01',current_month='2026-10-01')
+    assert out.iloc[-1].export_usd==125.
+    assert out.iloc[-1].status=='확정'
