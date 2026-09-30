@@ -1,0 +1,52 @@
+{
+  "start": "2024-09-01",
+  "end": "2026-08-01",
+  "countries": {
+    "US": "기존 24개월 사용",
+    "CN": "기존 24개월 사용",
+    "VN": "기존 24개월 사용",
+    "JP": "기존 24개월 사용",
+    "HK": 66336,
+    "TW": 90598,
+    "SG": 67696,
+    "IN": 85461,
+    "MY": 65861,
+    "DE": 99380,
+    "NL": 53582,
+    "PL": 45263,
+    "FR": 71728,
+    "GB": 75930,
+    "MX": 54883,
+    "ID": 80573,
+    "TH": 84968,
+    "CA": 66657,
+    "AU": 68794,
+    "IT": 78757,
+    "ES": 52905
+  },
+  "build": {
+    "top20_rows": 7600,
+    "middle_rows": 55860,
+    "product_rows": 167200,
+    "country_rows": 206520,
+    "cycle_rows": 65001,
+    "signal_rows": 4927,
+    "mart_path": "/home/runner/work/investment-advisor-dashboard/investment-advisor-dashboard/data/investment_mart.coverage.sqlite"
+  },
+  "validation": {
+    "ok": true,
+    "path": "/home/runner/work/investment-advisor-dashboard/investment-advisor-dashboard/data/share_snapshot.sqlite",
+    "rows": 7600,
+    "middle_rows": 55860,
+    "product_rows": 167200,
+    "taxonomy_top20": 20,
+    "built_at": "2026-09-30T02:04:00",
+    "latest_export_month": "2026-08",
+    "earliest_export_month": "1995-01",
+    "latest_kosis_month": "2026-07",
+    "taxonomy_hsk10": "8178",
+    "taxonomy_middle": "144",
+    "taxonomy_product": "439",
+    "promoted_to": "/home/runner/work/investment-advisor-dashboard/investment-advisor-dashboard/data/share_snapshot.sqlite"
+  }
+}
