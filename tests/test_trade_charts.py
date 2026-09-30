@@ -29,3 +29,22 @@ def test_mom_choice_updates_both_growth_series():
     lines=[t for t in fig.data if t.type=='scatter']
     assert [t.y[0] for t in lines]==[5,10]
     assert all('MoM' in t.name for t in lines)
+
+
+def test_provisional_hover_uses_actual_cutoff_for_every_summary_trace():
+    data=frame(200000000)
+    data['date']=pd.to_datetime(['2026-09-01'])
+    data['checkpoint_day']=20
+    fig=provisional_summary_figure(data,data,{'반도체':data})
+    assert all(pd.Timestamp(t.x[0])==pd.Timestamp('2026-09-20') for t in fig.data)
+    assert fig.layout.xaxis.hoverformat=='%Y년 %m월 1~%d일 잠정'
+    assert data.date.iloc[0]==pd.Timestamp('2026-09-01')
+
+
+def test_country_composition_and_growth_share_actual_month_end_date():
+    data=frame(200000000)
+    data['date']=pd.to_datetime(['2026-02-01'])
+    data['checkpoint_day']=28
+    composition=pd.DataFrame({'date':data.date, '중국':[100000000], 'Others':[100000000]})
+    fig=amount_growth_figure([('전체',data)],title='국가',composition=composition)
+    assert all(pd.Timestamp(t.x[0])==pd.Timestamp('2026-02-28') for t in fig.data)
