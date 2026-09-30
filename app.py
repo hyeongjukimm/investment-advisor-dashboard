@@ -741,7 +741,7 @@ def render_export_flash():
     total=series('product','전체')
     major=series('product','주요 10개 품목 합계')
     latest=total.iloc[-1]
-    st.caption(f'{start:%Y.%m}–{end:%Y.%m} · 매월 {checkpoint_labels[checkpoint]}끼리 비교 · 최신 집계 {latest.date:%Y.%m} 1~{int(latest.checkpoint_day)}일')
+    st.caption(f'{start:%Y.%m}–{end:%Y.%m} · 매월 {checkpoint_labels[checkpoint].replace("~", "–")}끼리 비교 · 최신 집계 {latest.date:%Y.%m} 1–{int(latest.checkpoint_day)}일')
     k1,k2,k3,k4=st.columns(4)
     k1.metric('전체 수출',usd100m(latest.export_usd),pct(latest.yoy_pct))
     k2.metric('전체 MoM',pct(latest.mom_pct))
