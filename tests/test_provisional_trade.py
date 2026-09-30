@@ -17,6 +17,14 @@ def test_xml_converts_thousand_dollars_and_preserves_month_end():
     assert set(df.status)=={'잠정'}
 
 
+def test_country_api_uses_item_amount_fields_with_country_labels():
+    df=parse_provisional_xml(xml('202609','01~20',[100]+list(range(1,11))),'country')
+    assert df.query("category == '중국'").iloc[0].export_usd==1000
+    assert df.query("category == '미국'").iloc[0].export_usd==2000
+    assert df.query("category == '말레이시아'").iloc[0].export_usd==10000
+    assert set(df.dimension)=={'country'}
+
+
 def test_missing_amount_is_not_zero_and_unknown_schema_rejected():
     df=parse_provisional_xml(xml('202609','01~20',['100','']+[10]*9),'product')
     assert pd.isna(df[df.category=='반도체'].iloc[0].export_usd)
