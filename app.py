@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import sqlite3
 from pathlib import Path
 
@@ -21,6 +22,8 @@ from flash_trade import flash_comparison_frame, load_flash_snapshots, refresh_fl
 from kosis_cache import read_kosis_cache, write_kosis_cache
 from kosis_client import fetch_kosis_history_payload
 from mart_builder import build_analysis_mart, mart_status
+from provisional_trade import PRODUCTS, COUNTRIES, TOP20_LINKS, load_snapshots, checkpoint_history, major_product_total, country_composition
+from trade_charts import amount_growth_figure, provisional_summary_figure
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -33,6 +36,7 @@ KOSIS_CACHE = DATA_DIR / "kosis_cycle_cache.csv"
 BRIDGE_PATH = DATA_DIR / "industry_export_bridge.csv"
 FLASH_SEED = DATA_DIR / "export_flash_seed.csv"
 FLASH_CACHE = DATA_DIR / "export_flash_cache.csv"
+PROVISIONAL_CACHE = DATA_DIR / "export_provisional.csv"
 
 st.set_page_config(page_title="Investment Advisor Tool v4.1", page_icon="📈", layout="wide")
 st.markdown(
@@ -328,7 +332,9 @@ with st.sidebar:
 st.title("Investment Advisor Tool · v4.1")
 st.caption("Top-down: 실물경기 → 수출 → 산업 → 세부제품 · Mart-first · 금액 단위: 억달러")
 
-PAGES = ["종합 현황", "산업 스크리너", "산업 상세", "수출 성장", "품목 모니터", "종목 후보", "최근 수출", "데이터 점검"]
+PAGES = ["종합 현황", "산업 상세", "수출 성장", "품목 모니터", "최근 수출", "데이터 점검"]
+if st.session_state.get("page") not in PAGES:
+    st.session_state["page"] = PAGES[0]
 page = st.radio("페이지", PAGES, horizontal=True, label_visibility="collapsed", key="page")
 
 available_start, available_end = mart_bounds()
@@ -351,7 +357,7 @@ if page not in ("수출 성장", "최근 수출"):
             if start_date < available_start or start_date > available_end:
                 raise ValueError(f"월간 품목 조회 가능 기간은 {available_start:%Y-%m-%d}~{available_end:%Y-%m-%d}입니다.")
             if end_date > available_end:
-                st.info(f"월간 HS10 품목 데이터는 {available_end:%Y-%m}까지입니다. 월간 차트는 해당 월까지 표시하며, 9월 잠정 총수출은 ‘최근 수출’에서 확인하세요.")
+                st.info(f"월간 HS10 품목 데이터는 {available_end:%Y-%m}까지입니다. 월간 차트는 해당 월까지 표시하며, 최신 잠정 수출은 ‘최근 수출’에서 확인하세요.")
                 end_date = available_end
             period_start, period_end = normalize_month_range(start_date, end_date)
             st.session_state["_last_valid_period"] = (period_start, period_end)
@@ -359,16 +365,6 @@ if page not in ("수출 성장", "최근 수출"):
             st.error(str(exc))
             period_start, period_end = st.session_state.get("_last_valid_period", (available_start, available_end))
         r4.metric("표시 기간", f"{period_start:%Y.%m}–{period_end:%Y.%m}")
-
-if page == "품목 모니터":
-    _flash = load_flash_snapshots(FLASH_SEED, FLASH_CACHE)
-    _flash = _flash.dropna(subset=["export_usd_m", "checkpoint_day"])
-    if not _flash.empty:
-        _recent = _flash.sort_values(["month", "checkpoint_day"]).iloc[-1]
-        _period = f"{_recent['month']} 1~{int(_recent['checkpoint_day'])}일"
-        st.info(f"최신 관세청 잠정 총수출 · {_period}: {usd100m(_recent['export_usd_m'] * 1_000_000)} "
-                f"(전년 동기 대비 {pct(_recent['export_yoy_pct'])}). 상세 비교는 ‘최근 수출’ 탭에서 확인하세요. "
-                "아래 품목 차트는 월간 HS10 확정 데이터 기준입니다. 잠정 총수출을 품목별 실적으로 배분하지 않습니다.")
 
 with st.expander("ⓘ 데이터·산출 기준", expanded=False):
     st.markdown(page_methodology(page))
@@ -386,8 +382,11 @@ def render_overview():
     if top20.empty:
         st.info("선택 기간 데이터가 없습니다."); return
     latest = top20["date"].max(); snap = top20[top20["date"] == latest].copy()
-    agg = top20.groupby("date", as_index=False)["export_usd"].sum().sort_values("date")
-    agg["top20_yoy"] = agg["export_usd"].pct_change(12, fill_method=None) * 100
+    agg_source = month_sql("mart_export_top20_monthly", period_start-pd.DateOffset(months=12), period_end)
+    agg = agg_source.groupby("date", as_index=False)["export_usd"].sum().sort_values("date")
+    previous = (agg["date"]-pd.DateOffset(months=12)).map(agg.set_index("date")["export_usd"]).replace(0,np.nan)
+    agg["top20_yoy"] = (agg["export_usd"]/previous-1)*100
+    agg = agg[agg["date"]>=period_start]
     total_latest = total[total["date"] == total["date"].max()].iloc[-1] if not total.empty else None
     latest_signal = signal[signal["date"] == signal["date"].max()].copy() if not signal.empty else pd.DataFrame()
     k1,k2,k3,k4 = st.columns(4)
@@ -396,18 +395,10 @@ def render_overview():
     k3.metric("수출 증가 품목", f"{int((snap['yoy_pct']>0).sum())}/20")
     k4.metric("실물·수출 동반개선", f"{int(((latest_signal['export_yoy']>0)&(latest_signal['inventory_cycle']>0)).sum())}/{len(latest_signal)}" if not latest_signal.empty else "KOSIS 필요")
 
-    c1,c2=st.columns(2)
-    with c1:
-        a=agg.copy(); a["Top20_억달러"]=a["export_usd"]/1e8
-        fig=go.Figure(); fig.add_trace(go.Scatter(x=a["date"],y=a["Top20_억달러"],name="Top20"))
-        if not total.empty: fig.add_trace(go.Scatter(x=total["date"],y=total["total_export_usd"]/1e8,name="총수출"))
-        fig.update_layout(title="① 한국 총수출 vs Top20")
-        render_chart(fig_layout(fig,330,"억달러"),source_key="mapping",csv_df=a,csv_name="overview_total_vs_top20",key="ov1")
-    with c2:
-        fig=go.Figure(); fig.add_trace(go.Scatter(x=agg["date"],y=agg["top20_yoy"],name="Top20 YoY"))
-        if not total.empty: fig.add_trace(go.Scatter(x=total["date"],y=total["total_yoy_pct"],name="총수출 YoY"))
-        fig.add_hline(y=0,line_dash="dash"); fig.update_layout(title="② 수출 모멘텀")
-        render_chart(fig_layout(fig,330,"YoY (%)"),source_key="customs_item",csv_df=agg,csv_name="overview_export_yoy",key="ov2")
+    a=agg.rename(columns={"top20_yoy": "yoy_pct"})
+    t=total.rename(columns={"total_export_usd":"export_usd", "total_yoy_pct":"yoy_pct"})
+    fig=amount_growth_figure([("총수출",t),("Top20",a)],title="① 한국 총수출 · Top20 금액과 성장률")
+    render_chart(fig,source_key="mapping",csv_df=t.merge(a,on="date",how="outer",suffixes=("_total","_top20")),csv_name="overview_amount_growth",key="ov1")
 
     c3,c4=st.columns(2)
     with c3:
@@ -418,8 +409,7 @@ def render_overview():
         fig=px.scatter(p,x="수출_억달러",y="yoy_pct",size="bubble",text="item20",title="④ 규모 × 성장",labels={"수출_억달러":"억달러","yoy_pct":"YoY (%)"}); fig.add_hline(y=0,line_dash="dash"); fig.update_traces(textposition="top center")
         render_chart(fig_layout(fig,420,"YoY (%)",False),source_key="customs_item",csv_df=p,csv_name="overview_size_growth",key="ov4")
 
-    c5,c6=st.columns(2)
-    with c5:
+    with st.container():
         if not kosis.empty:
             ka=kosis.groupby("date",as_index=False)[["production_yoy","shipment_yoy","inventory_yoy"]].mean()
             fig=go.Figure()
@@ -427,12 +417,6 @@ def render_overview():
             fig.add_hline(y=0,line_dash="dash"); fig.update_layout(title="⑤ KOSIS 연결업종 평균")
             render_chart(fig_layout(fig,330,"YoY (%)"),source_key="kosis_cycle",csv_df=ka,csv_name="overview_kosis",key="ov5")
         else: st.info("⑤ KOSIS 캐시가 없습니다.")
-    with c6:
-        if not latest_signal.empty:
-            p=latest_signal.sort_values("fundamental_score"); fig=px.bar(p,y="item20",x="fundamental_score",orientation="h",title="⑥ Fundamental Score",labels={"item20":"","fundamental_score":"Score"},hover_data=["export_momentum_score","inventory_cycle_score","real_activity_score","breadth_score","persistence_score","score_note"])
-            render_chart(fig_layout(fig,420,"Score",False),source_key="customs_kosis",csv_df=p,csv_name="overview_fundamental_score",key="ov6")
-        else: st.info("⑥ Fundamental Score는 KOSIS 연결 후 생성됩니다.")
-
     c7,c8=st.columns(2)
     with c7:
         if not latest_signal.empty:
@@ -580,85 +564,118 @@ def render_growth_leaders():
         st.dataframe(table,hide_index=True,width="stretch",height=365)
 
 
+def monthly_growth(frame):
+    frame=frame.sort_values('date').drop_duplicates('date',keep='last').copy()
+    values=frame.set_index('date')['export_usd']
+    for months, name in [(12,'yoy_pct'),(1,'mom_pct')]:
+        prev=(frame.date-pd.DateOffset(months=months)).map(values).replace(0,np.nan)
+        frame[name]=(frame.export_usd/prev-1)*100
+    frame['unit_price_usd_per_kg']=frame.export_usd/frame.export_weight.replace(0,np.nan)
+    return frame
+
+
 def render_product_monitor():
     dims=q("SELECT DISTINCT item20,middle_category,product FROM dim_product_taxonomy ORDER BY item20,middle_category,product")
     if dims.empty: st.info("Taxonomy 없음"); return
 
     def reset_from_item():
-        st.session_state["pm_mid"] = ALL_OPTION
-        st.session_state["pm_prod"] = ALL_OPTION
+        st.session_state['pm_mid']=ALL_OPTION
+        st.session_state['pm_prod']=ALL_OPTION
+        st.session_state['pm_geo']='전세계(전체)'
 
     def reset_from_middle():
-        st.session_state["pm_prod"] = ALL_OPTION
+        st.session_state['pm_prod']=ALL_OPTION
+        st.session_state['pm_geo']='전세계(전체)'
 
     c1,c2,c3=st.columns(3)
-    items=dims["item20"].drop_duplicates().tolist()
-    item=c1.selectbox("Top20",items,key="pm_item",on_change=reset_from_item)
+    item=c1.selectbox('Top20',dims.item20.drop_duplicates().tolist(),key='pm_item',on_change=reset_from_item)
     mids,_=drilldown_options(dims,item,ALL_OPTION)
-    if st.session_state.get("pm_mid") not in mids:
-        st.session_state["pm_mid"] = ALL_OPTION
-    mid=c2.selectbox("리서치중분류",mids,key="pm_mid",on_change=reset_from_middle)
+    if st.session_state.get('pm_mid') not in mids: st.session_state['pm_mid']=ALL_OPTION
+    mid=c2.selectbox('리서치중분류',mids,key='pm_mid',on_change=reset_from_middle)
     _,prods=drilldown_options(dims,item,mid)
-    if st.session_state.get("pm_prod") not in prods:
-        st.session_state["pm_prod"] = ALL_OPTION
-    product=c3.selectbox("대표품목",prods,key="pm_prod")
-
+    if st.session_state.get('pm_prod') not in prods: st.session_state['pm_prod']=ALL_OPTION
+    product=c3.selectbox('대표품목',prods,key='pm_prod')
     table,extra,params,label=product_monitor_selection(item,mid,product)
-    hist=month_sql(table,period_start,period_end,extra,params)
-    if hist.empty: st.info("선택 기간 데이터 없음"); return
-    latest=hist.iloc[-1]; k1,k2,k3,k4=st.columns(4); k1.metric("수출",usd100m(latest["export_usd"]),pct(latest["yoy_pct"])); k2.metric("MoM",pct(latest["mom_pct"])); k3.metric("중량",f"{latest['export_weight']/1e6:.1f}M" if pd.notna(latest['export_weight']) else "-"); k4.metric("수출단가",f"${latest['unit_price_usd_per_kg']:,.1f}/kg" if pd.notna(latest['unit_price_usd_per_kg']) else "-")
+    full_hist=month_sql(table,period_start-pd.DateOffset(months=12),period_end,extra,params)
+    hist=full_hist[full_hist.date>=period_start].copy() if not full_hist.empty else full_hist
+    if hist.empty: st.info('선택 기간 데이터 없음'); return
+
+    country_where=['date>=?','date<=?','item20=?']
+    country_params=[(period_start-pd.DateOffset(months=12)).strftime('%Y-%m-%d'),period_end.strftime('%Y-%m-%d'),item]
+    if mid!=ALL_OPTION: country_where.append('middle_category=?');country_params.append(mid)
+    if product!=ALL_OPTION: country_where.append('product=?');country_params.append(product)
+    country=q(f"""SELECT date,country_code,SUM(export_usd) AS export_usd,SUM(export_weight) AS export_weight
+                  FROM mart_product_country_monthly WHERE {' AND '.join(country_where)}
+                  GROUP BY date,country_code ORDER BY date,country_code""",tuple(country_params))
+    country_names={'CN':'중국','US':'미국','VN':'베트남','JP':'일본','HK':'홍콩','TW':'대만','SG':'싱가포르','IN':'인도','MY':'말레이시아','DE':'독일','NL':'네덜란드','GB':'영국','FR':'프랑스','PL':'폴란드','MX':'멕시코','ID':'인도네시아','TH':'태국','CA':'캐나다','AU':'호주','IT':'이탈리아','ES':'스페인'}
+    codes=country.country_code.drop_duplicates().tolist() if not country.empty else []
+    options=['전세계(전체)']+codes
+    if st.session_state.get('pm_geo') not in options: st.session_state['pm_geo']='전세계(전체)'
+    r1,r2,r3=st.columns(3)
+    geo=r1.selectbox('국가',options,key='pm_geo',format_func=lambda x:country_names.get(x,x))
+    mode=r2.selectbox('수출금액 구성',['상위 5개국 + Others','전체 합계'],key='pm_composition',disabled=geo!='전세계(전체)')
+    growth=r3.selectbox('성장률',['YoY','MoM'],key='pm_growth')
+    if geo!='전세계(전체)':
+        selected=monthly_growth(country[country.country_code==geo])
+        selected=selected[selected.date>=period_start]
+        title=f'{label} · {country_names.get(geo,geo)}'
+    else:
+        selected=hist.copy();title=f'{label} · 전세계'
+    if selected.empty: st.info('선택 국가·기간 데이터 없음');return
+    latest=selected.iloc[-1]
+    k1,k2,k3,k4=st.columns(4)
+    k1.metric('수출금액',usd100m(latest.export_usd),pct(latest.yoy_pct))
+    k2.metric('MoM',pct(latest.mom_pct))
+    k3.metric('중량',f'{latest.export_weight/1e6:,.2f}M kg' if pd.notna(latest.export_weight) else '-')
+    k4.metric('수출단가',f'${latest.unit_price_usd_per_kg:,.2f}/kg' if pd.notna(latest.unit_price_usd_per_kg) else '-')
+    composition=None
+    if geo=='전세계(전체)' and mode=='상위 5개국 + Others':
+        observed=country[country.date>=period_start]
+        if not observed.empty:
+            try:
+                candidate=country_composition(hist,observed,5)
+                # A country query has a bounded history; retain world totals outside it.
+                complete=candidate.dropna()
+                if not complete.empty:
+                    composition=candidate.copy()
+                    composition=composition.rename(columns=country_names)
+                    incomplete=composition.drop(columns='date').isna().any(axis=1)
+                    if incomplete.any():
+                        composition['세계 합계(국가 자료 미수집)']=np.where(incomplete,hist.set_index('date').export_usd.reindex(composition.date).to_numpy(),np.nan)
+                    st.caption(f'추적국 {observed.country_code.nunique()}개 중 기간 합계 상위 최대 5개국 · 국가별 자료: {complete.date.min():%Y.%m}–{complete.date.max():%Y.%m}. Others에는 추적되지 않은 국가도 포함됩니다.')
+            except ValueError as exc: st.warning(str(exc))
+        if composition is None: st.info('국가별 구성 자료가 없어 전세계 합계로 표시합니다.')
+    fig=amount_growth_figure([(country_names.get(geo,'전체'),selected)],title=title+' · 수출금액과 성장률',growth='yoy_pct' if growth=='YoY' else 'mom_pct',composition=composition)
+    render_chart(fig,source_key='customs_item_country' if geo!='전세계(전체)' or composition is not None else 'customs_item',csv_df=selected if composition is None else composition.merge(selected[['date','yoy_pct','mom_pct']],on='date'),csv_name=f'{label}_{geo}_amount_growth',key='pm1')
     c4,c5=st.columns(2)
     with c4:
-        p=hist.copy(); p["수출_억달러"]=p["export_usd"]/1e8; fig=px.line(p,x="date",y="수출_억달러",title=f"{label} · 수출액")
-        render_chart(fig_layout(fig,350,"억달러",False),source_key="customs_item",csv_df=p,csv_name=f"{label}_export",key="pm1")
+        fig=px.line(selected,x='date',y='unit_price_usd_per_kg',title=title+' · 중량 기준 수출단가',labels={'unit_price_usd_per_kg':'USD/kg'},markers=True)
+        render_chart(fig_layout(fig,350,'USD/kg',False),source_key='customs_item' if geo=='전세계(전체)' else 'customs_item_country',csv_df=selected[['date','export_usd','export_weight','unit_price_usd_per_kg']],csv_name=f'{label}_{geo}_unitprice',key='pm2')
     with c5:
-        fig=go.Figure(); fig.add_trace(go.Scatter(x=hist["date"],y=hist["yoy_pct"],name="YoY")); fig.add_trace(go.Scatter(x=hist["date"],y=hist["mom_pct"],name="MoM")); fig.add_hline(y=0,line_dash="dash"); fig.update_layout(title=f"{label} · 성장률")
-        render_chart(fig_layout(fig,350,"%"),source_key="customs_item",csv_df=hist,csv_name=f"{label}_growth",key="pm2")
-
-    country_where=["date>=?","date<=?","item20=?"]
-    country_params=[period_start.strftime("%Y-%m-%d"),period_end.strftime("%Y-%m-%d"),item]
-    if mid != ALL_OPTION:
-        country_where.append("middle_category=?"); country_params.append(mid)
-    if product != ALL_OPTION:
-        country_where.append("product=?"); country_params.append(product)
-    country=q(
-        f"""SELECT date,country_code,
-                   SUM(export_usd) AS export_usd,
-                   SUM(import_usd) AS import_usd,
-                   SUM(export_weight) AS export_weight,
-                   SUM(import_weight) AS import_weight,
-                   SUM(balance_usd) AS balance_usd
-            FROM mart_product_country_monthly
-            WHERE {' AND '.join(country_where)}
-            GROUP BY date,country_code
-            ORDER BY date,country_code""",
-        tuple(country_params),
-    )
-    if not country.empty:
-        country["unit_price_usd_per_kg"]=country["export_usd"].div(country["export_weight"].replace(0,np.nan))
-
-    c6,c7=st.columns(2)
-    with c6:
-        if not country.empty:
-            last=country[country["date"]==country["date"].max()].copy(); last["수출_억달러"]=last["export_usd"]/1e8; last=last.sort_values("수출_억달러")
-            fig=px.bar(last,y="country_code",x="수출_억달러",orientation="h",title="추적국가별 수출 · 최신월")
-            render_chart(fig_layout(fig,350,"억달러",False),source_key="customs_item_country",csv_df=last,csv_name=f"{label}_country",key="pm3")
-        else: st.info("현재 DB에 이 선택항목의 국가별 데이터가 없습니다.")
-    with c7:
-        if not country.empty:
-            countries=country["country_code"].drop_duplicates().tolist(); cc=st.selectbox("단가 국가",countries,key="pm_country"); cp=country[country["country_code"]==cc].copy()
-            fig=px.line(cp,x="date",y="unit_price_usd_per_kg",title=f"{cc} · 수출단가",labels={"unit_price_usd_per_kg":"USD/kg"})
-            render_chart(fig_layout(fig,350,"USD/kg",False),source_key="customs_item_country",csv_df=cp,csv_name=f"{label}_{cc}_unitprice",key="pm4")
-    with st.expander("HS10 lineage",expanded=False):
-        if mid == ALL_OPTION:
-            lin=q("SELECT hsk10,display_name,hs6,mti6,classification_status,classification_note FROM dim_product_taxonomy WHERE item20=? ORDER BY middle_category,product,hsk10",(item,))
-        elif product == ALL_OPTION:
-            lin=q("SELECT hsk10,display_name,hs6,mti6,classification_status,classification_note FROM dim_product_taxonomy WHERE item20=? AND middle_category=? ORDER BY product,hsk10",(item,mid))
-        else:
-            lin=q("SELECT hsk10,display_name,hs6,mti6,classification_status,classification_note FROM dim_product_taxonomy WHERE item20=? AND middle_category=? AND product=? ORDER BY hsk10",(item,mid,product))
-        st.dataframe(lin,hide_index=True,width="stretch")
-        st.caption("HS가 제품을 완전히 분리하지 못하는 경우 국가·중량·단가를 함께 보며 Proxy로 해석합니다.")
-
+        p=selected.assign(weight_m_kg=selected.export_weight/1e6)
+        fig=px.bar(p,x='date',y='weight_m_kg',title=title+' · 수출중량')
+        render_chart(fig_layout(fig,350,'백만 kg',False),source_key='customs_item' if geo=='전세계(전체)' else 'customs_item_country',csv_df=p[['date','export_weight']],csv_name=f'{label}_{geo}_weight',key='pm3')
+    st.caption('단가 = 동일 기간 수출금액 ÷ 순중량. 중량이 없거나 0이면 단가는 표시하지 않습니다.')
+    with st.expander('관련 산업 잠정치',expanded=True):
+        link=TOP20_LINKS.get(item)
+        snapshots=load_snapshots(PROVISIONAL_CACHE)
+        if link and not snapshots.empty:
+            rows=snapshots[(snapshots.dimension=='product')&(snapshots.category==link[0])].sort_values(['date','checkpoint_day'])
+            if not rows.empty:
+                recent=rows.iloc[-1]
+                series=checkpoint_history(snapshots,'product',recent.checkpoint,link[0])
+                last=series.iloc[-1]
+                st.write(f'{link[0]} 전체 · {last.date:%Y.%m} 1~{int(last.checkpoint_day)}일 · {usd100m(last.export_usd)} · YoY {pct(last.yoy_pct)}')
+                st.caption(f'{link[1]}. 기존 Top20과 집계 범위가 다를 수 있습니다. 세부 품목·중량·단가 잠정치는 제공되지 않습니다.')
+        elif not link: st.caption('선택 산업에 직접 연결할 주요품목 잠정치가 없습니다.')
+        else: st.caption('잠정치 API 수집 후 표시됩니다. 최근 수출에서 갱신 상태를 확인하세요.')
+    with st.expander('HS10 lineage',expanded=False):
+        where='item20=?';lin_params=[item]
+        if mid!=ALL_OPTION:where+=' AND middle_category=?';lin_params.append(mid)
+        if product!=ALL_OPTION:where+=' AND product=?';lin_params.append(product)
+        lin=q(f'SELECT hsk10,display_name,hs6,mti6,classification_status,classification_note FROM dim_product_taxonomy WHERE {where} ORDER BY hsk10',tuple(lin_params))
+        st.dataframe(lin,hide_index=True,width='stretch')
+        st.caption('HS가 제품을 완전히 분리하지 못하는 경우 국가·중량·단가를 함께 보며 Proxy로 해석합니다.')
 
 
 def render_stock_candidates():
@@ -690,22 +707,90 @@ def render_stock_candidates():
     st.caption("Exposure type/confidence/source를 반드시 남겨서 HS Proxy와 실제 기업 매출 노출을 구분합니다.")
 
 def render_export_flash():
-    flash=load_flash_snapshots(FLASH_SEED,FLASH_CACHE)
-    if flash.empty: st.info("Flash seed/cache 없음"); return
-    months=sorted(flash["month"].dropna().astype(str).unique()); month=st.selectbox("월",months,index=len(months)-1,key="flash_month")
-    current=flash[flash["month"].astype(str)==month].copy(); current["checkpoint_day"]=pd.to_numeric(current["checkpoint_day"],errors="coerce"); current=current.dropna(subset=["checkpoint_day","export_usd_m"]).sort_values("checkpoint_day")
-    if current.empty: st.info("선택한 월의 수출 속보 데이터가 없습니다."); return
-    latest=current.iloc[-1]; status_label=str(latest.get("status") or "잠정").strip()
-    st.caption("10일·20일·월말 수치는 관세청 잠정 총수출입니다. 월간 HS10 품목 데이터와 집계 주기·분류가 달라 직접 연결하지 않습니다. 이 자료에는 DRAM 세부 수출액이 없습니다.")
-    k1,k2,k3,k4=st.columns(4); k1.metric("누적 수출",usd100m(latest["export_usd_m"]*1_000_000)); k2.metric("전년 대비",pct(latest.get("export_yoy_pct"))); k3.metric("누적 수입",usd100m(latest.get("import_usd_m")*1_000_000)); k4.metric("상태",f"{status_label} · 1~{int(latest['checkpoint_day'])}일")
-    comp=flash_comparison_frame(flash,month,int(latest["checkpoint_day"])); c1,c2=st.columns(2)
-    with c1:
-        fig=px.line(current,x="checkpoint_day",y=current["export_usd_m"]/100,markers=True,title=f"{month} · 10일→20일→월말",labels={"checkpoint_day":"누적 일수","y":"억달러"})
-        render_chart(fig_layout(fig,350,"억달러",False),source_key="flash",csv_df=current,csv_name=f"flash_{month}",key="flash1")
-    with c2:
-        if not comp.empty:
-            comp=comp.copy(); comp["수출_억달러"]=comp["export_usd_m"]/100; fig=px.bar(comp,x="comparison",y="수출_억달러",title="전년·전월·5년평균 비교")
-            render_chart(fig_layout(fig,350,"억달러",False),source_key="flash",csv_df=comp,csv_name=f"flash_compare_{month}",key="flash2")
+    snapshots=load_snapshots(PROVISIONAL_CACHE)
+    if snapshots.empty:
+        st.info('주요품목·국가 잠정치 수집 결과가 아직 없습니다. 기존 총수출 공표자료를 표시합니다.')
+        legacy=load_flash_snapshots(FLASH_SEED,FLASH_CACHE)
+        if not legacy.empty:
+            st.dataframe(legacy.sort_values(['month','checkpoint_day'],ascending=False),hide_index=True,width='stretch')
+    status_path=DATA_DIR/'provisional_status.json'
+    if status_path.exists():
+        result=json.loads(status_path.read_text(encoding='utf-8'))
+        for dimension,name in [('product','품목'),('country','국가')]:
+            if not result.get(dimension,{}).get('ok'):
+                st.warning(f'{name} 잠정치 갱신: {result.get(dimension,{}).get("error","미확인")} · 기존 수집 자료 유지')
+        st.caption(f'잠정치 조회 시각: {result.get("fetched_at","-")}')
+    products=snapshots[snapshots.dimension=='product']
+    if products.empty:return
+    newest=products.sort_values(['date','checkpoint_day']).iloc[-1]
+    checkpoint_labels={'10':'1~10일','20':'1~20일','month_end':'월말 잠정'}
+    checkpoints=[c for c in ['10','20','month_end'] if c in products.checkpoint.unique()]
+    c1,c2,c3=st.columns(3)
+    checkpoint=c1.selectbox('집계 기간',checkpoints,index=checkpoints.index(newest.checkpoint),format_func=lambda x:checkpoint_labels[x],key='prov_checkpoint')
+    window=c2.selectbox('표시 기간',['3Y','5Y','전체'],key='prov_window')
+    growth=c3.selectbox('성장률',['YoY','MoM'],key='prov_growth')
+    dates=products[products.checkpoint==checkpoint].date
+    end=dates.max()
+    start=dates.min() if window=='전체' else max(dates.min(),end-pd.DateOffset(months=(36 if window=='3Y' else 60)-1))
+    combined=pd.concat([snapshots,major_product_total(snapshots)],ignore_index=True)
+    def series(dimension,category):
+        frame=checkpoint_history(combined,dimension,checkpoint,category)
+        return frame[(frame.date>=start)&(frame.date<=end)]
+    total=series('product','전체')
+    major=series('product','주요 10개 품목 합계')
+    latest=total.iloc[-1]
+    st.caption(f'{start:%Y.%m}–{end:%Y.%m} · 매월 {checkpoint_labels[checkpoint]}끼리 비교 · 최신 집계 {latest.date:%Y.%m} 1~{int(latest.checkpoint_day)}일')
+    k1,k2,k3,k4=st.columns(4)
+    k1.metric('전체 수출',usd100m(latest.export_usd),pct(latest.yoy_pct))
+    k2.metric('전체 MoM',pct(latest.mom_pct))
+    if not major.empty and major.iloc[-1].date==latest.date:
+        k3.metric('주요 10개 품목 합계',usd100m(major.iloc[-1].export_usd),pct(major.iloc[-1].yoy_pct))
+        k4.metric('주요품목 MoM',pct(major.iloc[-1].mom_pct))
+    else:
+        k3.metric('주요 10개 품목 합계','자료 불충분')
+        k4.metric('집계 상태','잠정')
+    frames={name:series('product',name) for name in PRODUCTS[1:]}
+    fig=provisional_summary_figure(total,major,frames,growth='yoy_pct' if growth=='YoY' else 'mom_pct')
+    download=pd.concat([total,major]+list(frames.values()),ignore_index=True)
+    render_chart(fig,source_key='provisional_product',csv_df=download,csv_name='provisional_total_major_products',key='prov_summary')
+    st.caption('주요품목 누적 막대는 API 제공 10개 품목의 합계입니다. 전체 수출의 부분집합이므로 전체 금액에 더하지 않습니다. 기존 Top20 합계와 분류가 다릅니다.')
+    st.subheader('품목별 잠정 수출')
+    for i in range(0,10,2):
+        cols=st.columns(2)
+        for j,col in enumerate(cols):
+            name=PRODUCTS[1+i+j];frame=frames[name]
+            with col:
+                st.markdown(f'### {name}')
+                if frame.empty:st.info('선택 기준 자료 없음');continue
+                last=frame.iloc[-1]
+                st.caption(f'{last.date:%Y.%m} · {usd100m(last.export_usd)} · YoY {pct(last.yoy_pct)} · MoM {pct(last.mom_pct)}')
+                fig=amount_growth_figure([(name,frame)],title=f'{name} · {checkpoint_labels[checkpoint]}',growth='yoy_pct' if growth=='YoY' else 'mom_pct')
+                render_chart(fig,source_key='provisional_product',csv_df=frame,csv_name=f'provisional_product_{i+j}',key=f'prov_product_{i+j}')
+    st.subheader('국가·지역별 잠정 수출')
+    st.caption('한국 전체 수출의 목적지별 통계입니다. 반도체 등 품목별 국가 실적으로 연결할 수 없습니다. 유럽연합은 지역 합계입니다.')
+    country_total=series('country','전체')
+    if country_total.empty:
+        st.info('국가 API 자료가 아직 수집되지 않았습니다. 위의 품목 잠정치는 정상 표시됩니다.')
+    else:
+        parts=snapshots[(snapshots.dimension=='country')&(snapshots.checkpoint==checkpoint)&(snapshots.category!='전체')&(snapshots.date>=start)&(snapshots.date<=end)].rename(columns={'category':'country_code'})
+        try:
+            composition=country_composition(country_total,parts,5)
+            fig=amount_growth_figure([('전체',country_total)],title='주요 5개 국가·지역 + Others / 전체 성장률',growth='yoy_pct' if growth=='YoY' else 'mom_pct',composition=composition)
+            render_chart(fig,source_key='provisional_country',csv_df=composition,csv_name='provisional_country_composition',key='prov_countries')
+        except ValueError as exc:st.warning(str(exc))
+        category=st.selectbox('국가·지역 상세',COUNTRIES[1:],key='prov_country')
+        frame=series('country',category)
+        if not frame.empty:
+            fig=amount_growth_figure([(category,frame)],title=f'{category} · {checkpoint_labels[checkpoint]}',growth='yoy_pct' if growth=='YoY' else 'mom_pct')
+            render_chart(fig,source_key='provisional_country',csv_df=frame,csv_name='provisional_country_detail',key='prov_country_detail')
+    with st.expander('Top20 연결과 데이터 범위'):
+        st.dataframe(pd.DataFrame([{'Top20':name,'잠정치 연결':link[0],'범위':link[1]} for name,link in TOP20_LINKS.items()]),hide_index=True,width='stretch')
+        st.caption('직접 대응하지 않는 정밀기기는 최근 수출에서 별도 표시합니다. 승용차·컴퓨터주변기기는 관련 산업의 일부입니다. 품목별 중량·단가 및 품목×국가 잠정치는 제공되지 않습니다.')
+    with st.expander('원자료·조회 이력'):
+        st.dataframe(download.sort_values(['date','checkpoint_day','category'],ascending=[False,False,True]),hide_index=True,width='stretch')
+        history_path=PROVISIONAL_CACHE.with_name(PROVISIONAL_CACHE.stem+'_history.csv')
+        if history_path.exists():
+            st.download_button('잠정치 수정 이력 CSV',history_path.read_bytes(),file_name='export_provisional_history.csv',mime='text/csv',key='prov_history_download')
 
 
 def render_data_qc():
@@ -723,11 +808,9 @@ def render_data_qc():
 
 
 if page=="종합 현황": render_overview()
-elif page=="산업 스크리너": render_industry_scanner()
 elif page=="산업 상세": render_industry_detail()
 elif page=="수출 성장": render_growth_leaders()
 elif page=="품목 모니터": render_product_monitor()
-elif page=="종목 후보": render_stock_candidates()
 elif page=="최근 수출": render_export_flash()
 elif page=="데이터 점검": render_data_qc()
 

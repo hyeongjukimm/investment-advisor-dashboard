@@ -10,10 +10,14 @@ def _db(path: Path, *, complete: bool = True, rows: int = 1):
     with sqlite3.connect(path) as con:
         con.execute("CREATE TABLE mart_metadata(key TEXT, value TEXT)")
         con.execute("INSERT INTO mart_metadata VALUES('latest_export_month','2026-08')")
-        con.execute("CREATE TABLE dim_product_taxonomy(hsk10 TEXT)")
+        con.execute("CREATE TABLE dim_product_taxonomy(hsk10 TEXT,item20 TEXT)")
+        con.executemany("INSERT INTO dim_product_taxonomy VALUES(?,?)",[(str(i),f'산업{i}') for i in range(20)])
         if complete:
             con.execute("CREATE TABLE mart_export_top20_monthly(date TEXT, item20 TEXT)")
             con.executemany("INSERT INTO mart_export_top20_monthly VALUES('2026-08-01','반도체')", [()] * rows)
+            for table in ['mart_export_middle_monthly','mart_export_product_monthly']:
+                con.execute(f'CREATE TABLE {table}(date TEXT)')
+                con.execute(f"INSERT INTO {table} VALUES('2026-08-01')")
 
 
 def test_validate_snapshot_rejects_missing_tables_and_empty_top20(tmp_path):

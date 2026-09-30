@@ -4,7 +4,7 @@ from pathlib import Path
 def test_v4_app_is_mart_first_and_has_phase1_pages():
     text=Path("app.py").read_text(encoding="utf-8")
     assert "Investment Advisor Tool · v4" in text
-    for page in ["종합 현황","산업 스크리너","산업 상세","수출 성장","품목 모니터","최근 수출","데이터 점검"]:
+    for page in ["종합 현황","산업 상세","수출 성장","품목 모니터","최근 수출","데이터 점검"]:
         assert page in text
     assert "resolve_mart_path" in text
     assert "mart_export_top20_monthly" in text

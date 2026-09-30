@@ -83,13 +83,12 @@ def run_refresh(base_dir: str | Path, *, environ=None) -> dict:
         except (requests.RequestException, KosisApiError) as exc:
             error_name = type(exc).__name__
             result["kosis"] = f"기존 캐시 유지 ({error_name})"
-            detail = str(exc).strip()
+            detail = str(exc).strip() if isinstance(exc, KosisApiError) else ""
             api_detail = str(getattr(exc, "err_msg", "") or "").strip()
             if api_detail and api_detail not in detail:
                 detail = f"{detail} · {api_detail}" if detail else api_detail
-            result["warnings"].append(
-                f"KOSIS 갱신 오류: {error_name}" + (f" · {detail}" if detail else "")
-            )
+            prefix = "KOSIS 갱신 오류" if isinstance(exc, KosisApiError) else "KOSIS 네트워크 오류"
+            result["warnings"].append(f"{prefix}: {error_name}" + (f" · {detail}" if detail else ""))
 
     if customs_key:
         mapping = pd.read_csv(data / "motir20_hsk_mti_mapping_2026.csv", dtype=str).fillna("")

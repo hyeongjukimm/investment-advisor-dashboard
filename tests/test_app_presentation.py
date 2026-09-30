@@ -24,7 +24,7 @@ def test_growth_page_uses_year_selector_and_hides_global_date_range():
     assert 'selectbox("기준 연도"' in TEXT
     assert "available_growth_years" in TEXT
     assert "growth_year_comparison_range" in TEXT
-    assert 'if page != "수출 성장":' in TEXT
+    assert 'if page not in ("수출 성장", "최근 수출"):' in TEXT
     assert "현재 비교:" in TEXT
 
 
@@ -35,10 +35,13 @@ def test_quick_range_always_controls_dates_until_direct_mode_is_selected():
 
 
 def test_navigation_and_flash_page_use_korean_labels_and_canonical_schema():
-    for label in ["종합 현황", "산업 스크리너", "산업 상세", "수출 성장", "품목 모니터", "종목 후보", "최근 수출", "데이터 점검"]:
+    for label in ["종합 현황", "산업 상세", "수출 성장", "품목 모니터", "최근 수출", "데이터 점검"]:
         assert label in TEXT
-    assert 'current["checkpoint_day"]' in TEXT
-    assert 'latest["export_usd_m"]' in TEXT
+    tree=ast.parse(TEXT)
+    pages=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='PAGES' for t in n.targets))
+    assert '산업 스크리너' not in pages and '종목 후보' not in pages
+    assert 'checkpoint_history' in TEXT
+    assert 'provisional_summary_figure' in TEXT
     assert 'current["checkpoint_days"]' not in TEXT
 
 

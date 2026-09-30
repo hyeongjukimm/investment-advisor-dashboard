@@ -6,7 +6,7 @@ SOURCE_CATALOG = {
         "institution": "관세청",
         "dataset": "관세청_품목별 수출입실적(GW)",
         "operation": "getItemtradeList",
-        "field": "expDlr",
+        "field": "expDlr · expWgt",
         "url": "https://www.data.go.kr/data/15101609/openapi.do",
         "processing": "월·HS10 수출신고 미화금액 → 2026 고정 택소노미 → 선택 분류 합산",
     },
@@ -57,6 +57,18 @@ SOURCE_CATALOG = {
         "field": "누적 수출·수입 미화금액",
         "url": "https://www.motie.go.kr/kor/article/ATCL3f49a5a8c/list",
         "processing": "동일 체크포인트 기준 전년·전월·5년 평균 비교",
+    },
+    "provisional_product": {
+        "institution": "관세청", "dataset": "수출 주요품목별 10일 단위 잠정치 통계",
+        "operation": "getPrlstMmUtPrviExpAcrs", "field": "itemUsdAmt00~10 · priodDt · priodMon",
+        "url": "https://www.data.go.kr/data/15157908/openapi.do",
+        "processing": "천 달러 → USD; 동일 10일·20일·월말 기준 전년·전월 비교; 주요품목 누적은 10개 합계",
+    },
+    "provisional_country": {
+        "institution": "관세청", "dataset": "수출 주요국가별 10일 단위 잠정치 통계",
+        "operation": "getCntyMmUtPrviExpAcrs", "field": "itemUsdAmt00~10 · priodDt · priodMon",
+        "url": "https://www.data.go.kr/data/15157941/openapi.do",
+        "processing": "천 달러 → USD; 전체 수출 목적지별 금액; 품목×국가 교차통계 아님",
     },
     "internal_exposure": {
         "institution": "내부 리서치",
@@ -110,9 +122,9 @@ PAGE_METHODOLOGY = {
     "산업 스크리너": f"**사용 데이터** · 관세청 `getItemtradeList/expDlr`, KOSIS `DT_1F02001/DT`\n\n**산출 방식** · {_COMMON_EXPORT} 펀더멘털 점수는 수출모멘텀 30%, 재고순환 25%, 실물활동 20%, 확산도 15%, 지속성 10%를 가용항목 기준 재가중합니다.",
     "산업 상세": f"**사용 데이터** · 관세청 `getItemtradeList/expDlr`, 연결 KSIC의 KOSIS `DT_1F02001/DT`\n\n**산출 방식** · {_COMMON_EXPORT} YoY는 전년 동월, MoM은 전월과 비교하고 재고순환은 출하 YoY-재고 YoY입니다.",
     "수출 성장": f"**사용 데이터** · 관세청 품목별 수출입실적(GW) `getItemtradeList/expDlr`와 2026 고정 택소노미\n\n**산출 방식** · {_COMMON_EXPORT}\n\n{{growth}}",
-    "품목 모니터": f"**사용 데이터** · 관세청 `getItemtradeList/expDlr`, 품목별 국가별 `getNitemtradeList/expDlr·expWgt`\n\n**산출 방식** · {_COMMON_EXPORT} 단가는 수출신고 미화금액÷순중량(USD/kg)입니다.",
+    "품목 모니터": f"**사용 데이터** · 관세청 `getItemtradeList/expDlr`, 품목별 국가별 `getNitemtradeList/expDlr·expWgt`\n\n**산출 방식** · {_COMMON_EXPORT} 전세계가 기본값입니다. 추적국의 기간 합계 상위 최대 5개국을 누적 막대로 표시하고 Others=전세계−표시국가 합계입니다. 국가 자료가 없는 기간은 세계 합계로 표시합니다. 단가는 수출신고 미화금액÷순중량(USD/kg)입니다.",
     "종목 후보": "**사용 데이터** · 대표품목 택소노미와 내부 company_exposure.csv\n\n**산출 방식** · 대표품목 ID 또는 품목명으로 기업 후보를 연결합니다. 통관액은 기업 매출이 아니므로 공시 검증이 필요합니다.",
-    "최근 수출": "**사용 데이터** · 관세청·산업통상자원부 10일·20일·월말 수출입 현황 공표자료\n\n**산출 방식** · 같은 누적 일수끼리 전년·전월·5년 평균과 비교합니다. 월중 수치는 잠정치입니다.",
+    "최근 수출": "**사용 데이터** · 관세청 수출 주요품목별·주요국가별 10일 단위 잠정치 API (`getPrlstMmUtPrviExpAcrs`, `getCntyMmUtPrviExpAcrs`)\n\n**산출 방식** · 원자료 천 달러를 USD로 변환합니다. 1~10일·1~20일·월말을 각각 분리하고 정확히 전년 같은 달·전월의 동일 집계 기준과 비교합니다. 주요품목 합계는 API의 10개 품목 합계이며 기존 Top20과 다릅니다. 국가 데이터는 한국 전체 수출의 목적지별 금액이며 품목×국가 잠정치는 제공하지 않습니다. 중량·단가도 제공되지 않습니다. 수집 시각과 수정 이력을 저장하며 누락값을 0으로 채우지 않습니다.",
     "데이터 점검": "**사용 데이터** · 관세청 `getItemtradeList/expDlr` 전체 HS10과 택소노미 매핑 결과\n\n**산출 방식** · Coverage=매핑 HS10 수출액÷전체 HS10 수출액×100, Gap=미매핑 HS10 수출액입니다.",
 }
 
