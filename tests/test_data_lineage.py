@@ -8,7 +8,7 @@ def test_source_catalog_identifies_raw_api_field_and_processing():
     assert item["institution"] == "관세청"
     assert item["dataset"] == "관세청_품목별 수출입실적(GW)"
     assert item["operation"] == "getItemtradeList"
-    assert item["field"] == "expDlr"
+    assert item["field"] == "expDlr · expWgt"
     assert "HS10" in item["processing"]
     assert "https://www.data.go.kr/data/15101609/openapi.do" == item["url"]
 

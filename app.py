@@ -13,6 +13,8 @@ import streamlit as st
 import urllib3
 
 from customs_pipeline import CustomsClient, refresh_customs_data
+from presentation_bootstrap import refresh_presentation_modules
+refresh_presentation_modules()
 from dashboard_utils import available_growth_years, growth_year_comparison_range, normalize_month_range, parse_date_text, quick_month_range, format_100m_usd, industry_period_summary, sidebar_guide_sections
 from data_lineage import page_methodology, source_caption
 from deployment_mode import allow_admin_controls, is_shared_mode
