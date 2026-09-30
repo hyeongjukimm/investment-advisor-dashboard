@@ -1,12 +1,13 @@
 {
   "product": {
     "ok": true,
-    "rows": 4246,
+    "rows": 484,
     "latest_month": "2026-09-01"
   },
   "country": {
-    "ok": false,
-    "error": "잠정치 country 응답 필드 확인 필요: ['itemUsdAmt00', 'itemUsdAmt01', 'itemUsdAmt02', 'itemUsdAmt03', 'itemUsdAmt04', 'itemUsdAmt05', 'itemUsdAmt06', 'itemUsdAmt07', 'itemUsdAmt08', 'itemUsdAmt09', 'itemUsdAmt10', 'priodDt', 'priodMon', 'priodYear']"
+    "ok": true,
+    "rows": 4246,
+    "latest_month": "2026-09-01"
   },
-  "fetched_at": "2026-09-30T01:44:35+00:00"
+  "fetched_at": "2026-09-30T01:48:18+00:00"
 }
