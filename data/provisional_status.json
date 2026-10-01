@@ -1,13 +1,13 @@
 {
   "product": {
     "ok": true,
-    "rows": 451,
+    "rows": 462,
     "latest_month": "2026-09-01"
   },
   "country": {
     "ok": true,
-    "rows": 451,
+    "rows": 462,
     "latest_month": "2026-09-01"
   },
-  "fetched_at": "2026-09-30T15:53:54+00:00"
+  "fetched_at": "2026-10-01T05:45:46+00:00"
 }
