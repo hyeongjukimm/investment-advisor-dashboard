@@ -1,268 +1,37 @@
 {
   "start": "1995-01-01",
   "end": "2026-08-01",
-  "countries": {},
-  "errors": [
-    {
-      "country": "AU",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "CA",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "CN",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "DE",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "ES",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "FR",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "GB",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "HK",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "ID",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "IN",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "IT",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "JP",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "MX",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "MY",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "NL",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "PL",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "SG",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "TH",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "TW",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "US",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "VN",
-      "start": "1995-01-01",
-      "end": "1995-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "AU",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "CA",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "CN",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "DE",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "ES",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "FR",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "GB",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "HK",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "ID",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "IN",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "IT",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "JP",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "MX",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "MY",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "NL",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "PL",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "SG",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "TH",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "TW",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "US",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    },
-    {
-      "country": "VN",
-      "start": "1996-01-01",
-      "end": "1996-12-01",
-      "error": "ConnectTimeout"
-    }
-  ],
-  "remaining_chunks": 567,
+  "countries": {
+    "AU": 34646,
+    "CA": 30594,
+    "CN": 92417,
+    "DE": 69360,
+    "ES": 21805,
+    "FR": 42117,
+    "GB": 49964,
+    "HK": 50722,
+    "ID": 34957,
+    "IN": 23261,
+    "IT": 47571,
+    "JP": 129872,
+    "MX": 17352,
+    "MY": 29161,
+    "NL": 28981,
+    "PL": 7498,
+    "SG": 36171,
+    "TH": 31193,
+    "TW": 50482,
+    "US": 118686,
+    "VN": 26646
+  },
+  "errors": [],
+  "remaining_chunks": 525,
   "complete": false,
   "build": {
     "top20_rows": 7600,
     "middle_rows": 55860,
     "product_rows": 167200,
-    "country_rows": 530400,
+    "country_rows": 3171960,
     "cycle_rows": 65016,
     "signal_rows": 4940,
     "mart_path": "/home/runner/work/investment-advisor-dashboard/investment-advisor-dashboard/data/investment_mart.coverage.sqlite"
@@ -274,7 +43,7 @@
     "middle_rows": 55860,
     "product_rows": 167200,
     "taxonomy_top20": 20,
-    "built_at": "2026-10-02T09:35:37",
+    "built_at": "2026-10-02T16:22:45",
     "latest_export_month": "2026-08",
     "earliest_export_month": "1995-01",
     "latest_kosis_month": "2026-08",
