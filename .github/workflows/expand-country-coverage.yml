@@ -6,9 +6,9 @@ on:
       - refresh_country_coverage.py
       - .github/workflows/expand-country-coverage.yml
   workflow_dispatch:
-  # KST 20:15에 미수집 과거 월을 재시도; 이미 확보한 월은 다시 요청하지 않음.
+  # Entire monthly history is collected in resumable batches.
   schedule:
-    - cron: '15 11 * * *'
+    - cron: '15 */2 * * *'
 permissions:
   contents: write
 concurrency:
@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 90
     env:
       CUSTOMS_SERVICE_KEY: ${{ secrets.CUSTOMS_SERVICE_KEY }}
-      CUSTOMS_ITEM_COUNTRY_MONTHS: '60'
+      CUSTOMS_COUNTRY_BATCH_CHUNKS: '42'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -49,7 +49,9 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -f data/share_snapshot.sqlite data/country_coverage_status.json
+          python snapshot_storage.py data/share_snapshot.sqlite
+          git rm --cached --ignore-unmatch data/share_snapshot.sqlite
+          git add -f data/share_snapshot.sqlite.gz data/country_coverage_status.json
           git diff --cached --quiet || git commit -m "data: expand monitored monthly destinations"
-          git pull --rebase origin main
+          git pull --rebase --autostash origin main
           git push

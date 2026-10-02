@@ -74,9 +74,17 @@ def _get_secret(name: str, default=""):
     return os.getenv(name, default)
 
 
+from snapshot_storage import materialize_snapshot
+
+
 def resolve_mart_path() -> Path | None:
     if mart_status(LOCAL_MART).get("ready"):
         return LOCAL_MART
+    packed=SHARE_MART.with_suffix(".sqlite.gz")
+    if packed.exists():
+        unpacked=materialize_snapshot(packed)
+        if mart_status(unpacked).get("ready"):
+            return unpacked
     if mart_status(SHARE_MART).get("ready"):
         return SHARE_MART
     return None
@@ -767,14 +775,18 @@ def render_export_flash():
     st.subheader('품목별 잠정 수출')
     selected=st.multiselect('표시 품목',PRODUCTS[1:],default=[PRODUCTS[1]],key='prov_selected_products')
     if not selected:st.info('표시할 품목을 선택하세요.')
-    for name in selected:
-        frame=series('product',name)
-        st.markdown(f'### {name}')
-        if frame.empty:st.info('선택 품목 자료 없음');continue
-        last=frame.iloc[-1]
-        st.caption(f'{last.period_label.replace("~","–")} · {usd100m(last.export_usd)} · YoY {pct(last.yoy_pct)} · MoM {pct(last.mom_pct)}')
-        fig=recent_export_figure([(name,frame)],title=f'{name} · 월 전체 + 당월 잠정 누적',growth=growth_key)
-        render_chart(fig,source_key='recent_monthly_provisional',csv_df=frame,csv_name=f'recent_product_{PRODUCTS.index(name)}',key=f'prov_product_{PRODUCTS.index(name)}')
+    column_count=2 if len(selected)==4 else min(3,max(1,len(selected)))
+    for offset in range(0,len(selected),column_count):
+        columns=st.columns(column_count)
+        for column,name in zip(columns,selected[offset:offset+column_count]):
+            with column:
+                frame=series('product',name)
+                st.markdown(f'### {name}')
+                if frame.empty:st.info('선택 품목 자료 없음');continue
+                last=frame.iloc[-1]
+                st.caption(f'{last.period_label.replace("~","–")} · {usd100m(last.export_usd)} · YoY {pct(last.yoy_pct)} · MoM {pct(last.mom_pct)}')
+                fig=recent_export_figure([(name,frame)],title=f'{name} · 월 전체 + 당월 잠정 누적',growth=growth_key)
+                render_chart(fig,source_key='recent_monthly_provisional',csv_df=frame,csv_name=f'recent_product_{PRODUCTS.index(name)}',key=f'prov_product_{PRODUCTS.index(name)}')
     st.subheader('국가·지역별 잠정 수출')
     st.caption('한국 전체 수출의 목적지별 통계입니다. 품목별 국가 실적으로 연결할 수 없습니다. 유럽연합은 지역 합계입니다.')
     country_total=series('country','전체')

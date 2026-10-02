@@ -54,7 +54,9 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -f data/share_snapshot.sqlite data/refresh_status.json data/export_flash_cache.csv
+          python snapshot_storage.py data/share_snapshot.sqlite
+          git rm --cached --ignore-unmatch data/share_snapshot.sqlite
+          git add -f data/share_snapshot.sqlite.gz data/refresh_status.json data/export_flash_cache.csv
           git diff --cached --quiet || git commit -m "data: refresh verified dashboard snapshot"
-          git pull --rebase origin main
+          git pull --rebase --autostash origin main
           git push

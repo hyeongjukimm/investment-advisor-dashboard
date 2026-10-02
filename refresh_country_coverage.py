@@ -27,38 +27,44 @@ def missing_country_chunks(raw, country, start, end):
     return ranges
 
 
+def coverage_bounds(raw):
+    with sqlite3.connect(raw) as con:
+        earliest,latest=con.execute('SELECT MIN(date),MAX(date) FROM raw_item').fetchone()
+    if earliest is None or latest is None:raise ValueError('월별 세계 수출 원본이 없습니다')
+    return pd.Timestamp(earliest),pd.Timestamp(latest)
+
+
 def expand_country_coverage(root: Path):
     data = root / 'data'
     raw = data / 'investment_advisor.sqlite'
     key = os.environ.get('CUSTOMS_SERVICE_KEY', '')
     if not key:
         raise RuntimeError('CUSTOMS_SERVICE_KEY 미설정')
-    with sqlite3.connect(raw) as con:
-        latest = con.execute('SELECT MAX(date) FROM raw_item').fetchone()[0]
-    end = pd.Timestamp(latest)
-    months=int(os.environ.get('CUSTOMS_ITEM_COUNTRY_MONTHS','60'))
-    if not 15<=months<=120:raise ValueError('국가별 수집 범위는 15~120개월이어야 합니다')
-    start = end - pd.DateOffset(months=months-1)
-    client = CustomsClient(key, timeout=90)
-    report = {'start': str(start.date()), 'end': str(end.date()), 'countries': {}}
+    start,end=coverage_bounds(raw)
+    limit=int(os.environ.get('CUSTOMS_COUNTRY_BATCH_CHUNKS','42'))
+    if limit<1:raise ValueError('수집 배치는 1 이상이어야 합니다')
+    client=CustomsClient(key,timeout=90)
+    report={'start':str(start.date()),'end':str(end.date()),'countries':{},'errors':[]}
+    pending=[(a,b,country) for country in DESTINATIONS for a,b in missing_country_chunks(raw,country,start,end)]
+    # Collect the same historical years across destinations before the next year.
+    pending.sort(key=lambda chunk:(chunk[0],chunk[2]))
+    for a,b,country in pending[:limit]:
+        try:
+            frame=normalize_item_country(client.fetch('item_country',a,b,country_code=country))
+            if frame.empty:raise ValueError('빈 응답')
+            upsert_dataframe(raw,'raw_item_country',frame,['date','country_code','hsk10'])
+            report['countries'][country]=report['countries'].get(country,0)+len(frame)
+            print(f'{country} {a:%Y-%m}..{b:%Y-%m}: {len(frame):,}개 수집',flush=True)
+        except Exception as exc:
+            # Retain successful chunks; failed ranges remain pending for the next run.
+            report['errors'].append({'country':country,'start':str(a.date()),'end':str(b.date()),'error':type(exc).__name__})
+            print(f'{country} {a:%Y-%m}..{b:%Y-%m}: 재시도 예정 ({type(exc).__name__})',flush=True)
+    report['remaining_chunks']=sum(len(missing_country_chunks(raw,country,start,end)) for country in DESTINATIONS)
+    report['complete']=report['remaining_chunks']==0
     for country in DESTINATIONS:
-        chunks=missing_country_chunks(raw,country,start,end)
-        if not chunks:
-            report['countries'][country] = f'기존 {months}개월 사용'
-            continue
-        received = 0
-        for a, b in chunks:
-            rows = client.fetch('item_country', a, b, country_code=country)
-            frame = normalize_item_country(rows)
-            if frame.empty:
-                raise RuntimeError(f'{country} 월별 품목 응답이 비어 있습니다')
-            upsert_dataframe(raw, 'raw_item_country', frame, ['date','country_code','hsk10'])
-            received += len(frame)
         with sqlite3.connect(raw) as con:
-            count = con.execute('SELECT COUNT(*) FROM raw_item_country WHERE country_code=?', (country,)).fetchone()[0]
-        _update_meta(raw, f'item_country:{country}', end, count, f'country coverage: {start:%Y-%m}..{end:%Y-%m}')
-        report['countries'][country] = received
-        print(f'{country}: {received:,}개 월·HS10 관측치 수집')
+            count=con.execute('SELECT COUNT(*) FROM raw_item_country WHERE country_code=?',(country,)).fetchone()[0]
+        _update_meta(raw,f'item_country:{country}',end,count,f'full country history: {start:%Y-%m}..{end:%Y-%m}')
     candidate = data / 'investment_mart.coverage.sqlite'
     share = data / 'share_snapshot.coverage.sqlite'
     report['build'] = build_analysis_mart(raw, candidate, data/'motir20_hsk_mti_mapping_2026_full_clean.csv', data/'kosis_cycle_cache.csv', data/'industry_export_bridge.csv')
