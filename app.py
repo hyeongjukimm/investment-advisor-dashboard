@@ -649,6 +649,7 @@ def render_product_monitor():
                     incomplete=composition.drop(columns='date').isna().any(axis=1)
                     if incomplete.any():
                         composition['세계 합계(국가 자료 미수집)']=np.where(incomplete,hist.set_index('date').export_usd.reindex(composition.date).to_numpy(),np.nan)
+                        st.caption('회색 막대 = 국가별 자료 미수집 기간의 세계 합계입니다. 노란 Others와 구분하며 국가 비중을 추정하지 않습니다.')
                     st.caption(f'추적국 {observed.country_code.nunique()}개 중 기간 합계 상위 최대 5개국 · 국가별 자료: {complete.date.min():%Y.%m}–{complete.date.max():%Y.%m}. Others에는 추적되지 않은 국가도 포함됩니다.')
             except ValueError as exc: st.warning(str(exc))
         if composition is None: st.info('국가별 구성 자료가 없어 전세계 합계로 표시합니다.')

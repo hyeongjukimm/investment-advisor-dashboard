@@ -22,7 +22,9 @@ def amount_growth_figure(series: list[tuple[str, pd.DataFrame]], *, title: str, 
         composition_dates = composition.date.map(date_map)
         for column in composition.columns:
             if column != 'date':
-                fig.add_trace(go.Bar(x=composition_dates, y=composition[column] / 1e8, name=column, offsetgroup='amount'), secondary_y=False)
+                color='#a0a7b3' if column=='세계 합계(국가 자료 미수집)' else '#e0b33d' if column=='Others' else None
+                fig.add_trace(go.Bar(x=composition_dates, y=composition[column] / 1e8, name=column,
+                    marker_color=color, offsetgroup='amount'), secondary_y=False)
     else:
         for i, (name, frame) in enumerate(series):
             fig.add_trace(go.Bar(x=chart_dates(frame), y=frame.export_usd / 1e8, name=f'{name} 수출액',

@@ -8,8 +8,11 @@ on:
       - .github/workflows/refresh-provisional.yml
   workflow_dispatch:
   schedule:
-    # 한국시간 09:15, 12:15, 18:15: 발표 및 API 반영 지연을 고려해 재조회
-    - cron: '15 0,3,9 * * *'
+    # API 공식 제공일: 11일, 21일, 익월 1일. 정확한 갱신 시각은 미공개.
+    # 매일 KST 08:05, 09:05, 12:05, 18:05 조회 (UTC의 23시는 다음날 08시).
+    - cron: '5 23,0,3,9 * * *'
+    # 제공일 및 휴일/반영 지연 대비 추가 KST 10:05, 11:05, 14:05~17:05 조회.
+    - cron: '5 1,2,5,6,7,8 1-3,11-14,21-24 * *'
 
 permissions:
   contents: write

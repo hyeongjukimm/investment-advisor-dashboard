@@ -48,3 +48,13 @@ def test_country_composition_and_growth_share_actual_month_end_date():
     composition=pd.DataFrame({'date':data.date, '중국':[100000000], 'Others':[100000000]})
     fig=amount_growth_figure([('전체',data)],title='국가',composition=composition)
     assert all(pd.Timestamp(t.x[0])==pd.Timestamp('2026-02-28') for t in fig.data)
+
+
+def test_uncollected_country_history_is_distinct_from_others():
+    data=frame(200000000)
+    composition=pd.DataFrame({'date':data.date,'중국':[float('nan')],'Others':[float('nan')],'세계 합계(국가 자료 미수집)':[200000000]})
+    fig=amount_growth_figure([('전체',data)],title='국가',composition=composition)
+    unknown=next(t for t in fig.data if t.name=='세계 합계(국가 자료 미수집)')
+    assert unknown.marker.color=='#a0a7b3'
+    assert unknown.y[0]==2
+    assert next(t for t in fig.data if t.name=='Others').marker.color=='#e0b33d'
