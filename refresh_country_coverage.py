@@ -34,6 +34,13 @@ def coverage_bounds(raw):
     return pd.Timestamp(earliest),pd.Timestamp(latest)
 
 
+def prioritize_chunks(raw,chunks):
+    with sqlite3.connect(raw) as con:
+        con.execute('CREATE TABLE IF NOT EXISTS country_coverage_attempts(country TEXT,start TEXT,end TEXT,attempts INTEGER, PRIMARY KEY(country,start,end))')
+        attempts={(country,a,b):count for country,a,b,count in con.execute('SELECT country,start,end,attempts FROM country_coverage_attempts')}
+    return sorted(chunks,key=lambda chunk:(attempts.get((chunk[2],str(chunk[0].date()),str(chunk[1].date())),0),chunk[0],chunk[2]))
+
+
 def expand_country_coverage(root: Path):
     data = root / 'data'
     raw = data / 'investment_advisor.sqlite'
@@ -47,8 +54,10 @@ def expand_country_coverage(root: Path):
     report={'start':str(start.date()),'end':str(end.date()),'countries':{},'errors':[]}
     pending=[(a,b,country) for country in DESTINATIONS for a,b in missing_country_chunks(raw,country,start,end)]
     # Collect the same historical years across destinations before the next year.
-    pending.sort(key=lambda chunk:(chunk[0],chunk[2]))
+    pending=prioritize_chunks(raw,pending)
     for a,b,country in pending[:limit]:
+        with sqlite3.connect(raw) as con:
+            con.execute('INSERT INTO country_coverage_attempts VALUES(?,?,?,1) ON CONFLICT(country,start,end) DO UPDATE SET attempts=attempts+1',(country,str(a.date()),str(b.date())))
         try:
             frame=normalize_item_country(client.fetch('item_country',a,b,country_code=country))
             if frame.empty:raise ValueError('빈 응답')

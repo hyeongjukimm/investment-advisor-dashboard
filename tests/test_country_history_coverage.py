@@ -31,3 +31,15 @@ def test_full_history_starts_at_first_world_observation(tmp_path):
     chunks=missing_country_chunks(raw,'US',*coverage_bounds(raw))
     assert chunks[0][0]==pd.Timestamp('1995-01-01')
     assert chunks[-1][1]==pd.Timestamp('2026-08-01')
+
+
+def test_failed_old_range_does_not_block_other_history(tmp_path):
+    import sqlite3
+    from refresh_country_coverage import prioritize_chunks
+    raw=tmp_path/'raw.sqlite';init_sqlite_db(raw)
+    with sqlite3.connect(raw) as con:
+        con.execute('CREATE TABLE country_coverage_attempts(country TEXT,start TEXT,end TEXT,attempts INTEGER, PRIMARY KEY(country,start,end))')
+        con.execute("INSERT INTO country_coverage_attempts VALUES('US','1995-01-01','1995-12-01',1)")
+    old=(pd.Timestamp('1995-01-01'),pd.Timestamp('1995-12-01'),'US')
+    newer=(pd.Timestamp('1996-01-01'),pd.Timestamp('1996-12-01'),'US')
+    assert prioritize_chunks(raw,[old,newer])==[newer,old]

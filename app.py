@@ -205,7 +205,7 @@ def _figure_frame(fig: go.Figure) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
-def render_chart(fig: go.Figure, *, source_key: str, csv_df: pd.DataFrame | None = None, csv_name: str = "chart", key: str | None = None, selectable: bool = False):
+def render_chart(fig: go.Figure, *, source_key: str, csv_df: pd.DataFrame | None = None, csv_name: str = "chart", key: str | None = None, selectable: bool = False, compact: bool = False):
     kwargs = {"width": "stretch"}
     if key:
         kwargs["key"] = key
@@ -215,7 +215,10 @@ def render_chart(fig: go.Figure, *, source_key: str, csv_df: pd.DataFrame | None
     event = st.plotly_chart(fig, **kwargs)
     raw = csv_df.copy() if isinstance(csv_df, pd.DataFrame) else _figure_frame(fig)
     if not raw.empty:
-        _, dl = st.columns([12, 1])
+        if compact:
+            dl=st.container()
+        else:
+            _, dl = st.columns([12, 1])
         with dl:
             st.download_button(
                 "CSV",
@@ -226,7 +229,8 @@ def render_chart(fig: go.Figure, *, source_key: str, csv_df: pd.DataFrame | None
                 help="현재 차트에 표출된 데이터",
                 width="content",
             )
-    st.caption(source_caption(source_key))
+    if not compact:
+        st.caption(source_caption(source_key))
     return event
 
 
@@ -786,7 +790,7 @@ def render_export_flash():
                 last=frame.iloc[-1]
                 st.caption(f'{last.period_label.replace("~","–")} · {usd100m(last.export_usd)} · YoY {pct(last.yoy_pct)} · MoM {pct(last.mom_pct)}')
                 fig=recent_export_figure([(name,frame)],title=f'{name} · 월 전체 + 당월 잠정 누적',growth=growth_key)
-                render_chart(fig,source_key='recent_monthly_provisional',csv_df=frame,csv_name=f'recent_product_{PRODUCTS.index(name)}',key=f'prov_product_{PRODUCTS.index(name)}')
+                render_chart(fig,source_key='recent_monthly_provisional',csv_df=frame,csv_name=f'recent_product_{PRODUCTS.index(name)}',key=f'prov_product_{PRODUCTS.index(name)}',compact=True)
     st.subheader('국가·지역별 잠정 수출')
     st.caption('한국 전체 수출의 목적지별 통계입니다. 품목별 국가 실적으로 연결할 수 없습니다. 유럽연합은 지역 합계입니다.')
     country_total=series('country','전체')
