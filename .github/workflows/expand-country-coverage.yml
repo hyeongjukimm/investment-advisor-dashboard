@@ -6,6 +6,9 @@ on:
       - refresh_country_coverage.py
       - .github/workflows/expand-country-coverage.yml
   workflow_dispatch:
+  # KST 20:15에 미수집 과거 월을 재시도; 이미 확보한 월은 다시 요청하지 않음.
+  schedule:
+    - cron: '15 11 * * *'
 permissions:
   contents: write
 concurrency:

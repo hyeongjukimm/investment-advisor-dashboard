@@ -18,7 +18,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: investment-advisor-data-refresh
+  group: investment-advisor-provisional-refresh
   cancel-in-progress: false
 
 jobs:
