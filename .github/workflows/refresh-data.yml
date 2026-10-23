@@ -1,6 +1,10 @@
 name: 최신 데이터 갱신
 
 on:
+  push:
+    paths:
+      - snapshot_storage.py
+      - .github/workflows/refresh-data.yml
   schedule:
     - cron: '30 23 * * *'
   workflow_dispatch:
@@ -56,7 +60,7 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           python snapshot_storage.py data/share_snapshot.sqlite
           git rm --cached --ignore-unmatch data/share_snapshot.sqlite
-          git add -f data/share_snapshot.sqlite.gz data/refresh_status.json data/export_flash_cache.csv
+          git add -f -A -- data/share_snapshot.sqlite.gz data/share_snapshot.sqlite.gz.part-* data/refresh_status.json data/export_flash_cache.csv
           git diff --cached --quiet || git commit -m "data: refresh verified dashboard snapshot"
           git pull --rebase --autostash origin main
           git push
