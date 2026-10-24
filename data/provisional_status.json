@@ -1,11 +1,13 @@
 {
   "product": {
-    "ok": false,
-    "error": "ConnectTimeout"
+    "ok": true,
+    "rows": 484,
+    "latest_month": "2026-10-01"
   },
   "country": {
-    "ok": false,
-    "error": "ConnectTimeout"
+    "ok": true,
+    "rows": 484,
+    "latest_month": "2026-10-01"
   },
-  "fetched_at": "2026-10-24T01:35:49+00:00"
+  "fetched_at": "2026-10-24T05:34:49+00:00"
 }
