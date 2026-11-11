@@ -1,14 +1,14 @@
 {
   "ok": true,
-  "started_at": "2026-11-10T04:44:14+00:00",
+  "started_at": "2026-11-11T02:54:15+00:00",
   "kosis": "224,856행 갱신",
-  "customs": "2026-09 갱신",
+  "customs": "2026-10 갱신",
   "warnings": [],
   "build": {
-    "top20_rows": 7620,
-    "middle_rows": 56007,
-    "product_rows": 167640,
-    "country_rows": 3460242,
+    "top20_rows": 7640,
+    "middle_rows": 56154,
+    "product_rows": 168080,
+    "country_rows": 3469324,
     "cycle_rows": 65031,
     "signal_rows": 4953,
     "mart_path": "/home/runner/work/investment-advisor-dashboard/investment-advisor-dashboard/data/investment_mart.candidate.sqlite"
@@ -16,12 +16,12 @@
   "snapshot": {
     "ok": true,
     "path": "/home/runner/work/investment-advisor-dashboard/investment-advisor-dashboard/data/share_snapshot.sqlite",
-    "rows": 7620,
-    "middle_rows": 56007,
-    "product_rows": 167640,
+    "rows": 7640,
+    "middle_rows": 56154,
+    "product_rows": 168080,
     "taxonomy_top20": 20,
-    "built_at": "2026-11-10T04:55:00",
-    "latest_export_month": "2026-09",
+    "built_at": "2026-11-11T03:07:22",
+    "latest_export_month": "2026-10",
     "earliest_export_month": "1995-01",
     "latest_kosis_month": "2026-09",
     "taxonomy_hsk10": "8178",
@@ -29,5 +29,5 @@
     "taxonomy_product": "439",
     "promoted_to": "/home/runner/work/investment-advisor-dashboard/investment-advisor-dashboard/data/share_snapshot.sqlite"
   },
-  "finished_at": "2026-11-10T04:55:01+00:00"
+  "finished_at": "2026-11-11T03:07:23+00:00"
 }
